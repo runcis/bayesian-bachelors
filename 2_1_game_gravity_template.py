@@ -3,8 +3,7 @@ import numpy as np
 import matplotlib
 import time
 import math
-matplotlib.use("TkAgg") # for unix/windows
-#matplotlib.use("MacOSX") # for mac
+matplotlib.use("TkAgg")
 
 import matplotlib.pyplot as plt
 plt.rcParams["figure.figsize"] = (7, 7) # size of window
@@ -49,7 +48,27 @@ def translation_mat(dx, dy):
     #return T
 
 def scale_mat(figure):
-    return figure/2
+    scaleReductionMatrix = np.array([
+        [0.4, 0.0],
+        [0.0, 0.8]
+    ])
+    return dot(figure,scaleReductionMatrix)
+
+def reduceEmmission(figure):
+    scaleReductionMatrix = np.array([
+        [0.75, 0.0],
+        [0.0, 0.75]
+    ])
+    reducedMatrix = dot(figure, scaleReductionMatrix)
+    return reducedMatrix
+
+    
+def clearMatrix(matrix):
+    nullMatrix = np.array([
+        [0.0, 0.0],
+        [0.0, 0.0]
+    ])
+    return dot(matrix,nullMatrix)
 
 def dot(X, Y):
     is_transposed = False
@@ -126,7 +145,7 @@ class MovableObject(object):
         self.vec_dir = np.copy(self.vec_dir_init)
 
         self.external_forces = np.zeros((3, 2)) # 3,2
-        self.speed = 1.0
+        self.speed = 0.6
 
     def set_angle(self, angle):
         self.__angle = angle # encapsulation
@@ -158,10 +177,8 @@ class MovableObject(object):
 
 
         self.vec_pos += self.vec_dir * self.speed * dt
-        self.vec_pos += np.mean(self.external_forces * dt, axis=0) #(3,2) > (2,)
+        self.vec_pos += np.mean(self.external_forces * dt, axis=0)
         self.__update_transformation()
-        #self.speed -= dt*0.5
-        #self.speed = max(0, self.speed)
 
 
     def __update_transformation(self):
@@ -198,15 +215,16 @@ class Player(MovableObject):
 
         self.geometry = scale_mat(self.geometry)
         self.vec_pos = np.array([0.0, 0.0])
-        self.speed = 1
+        self.speed = 0.75
 
     def activate_thrusters(self):
-        self.speed += 1.5
+        self.speed += 1.3
+
         pass
 
     def update_movement(self, dt):
         self.speed -= dt * 0.5
-        self.speed = max(1, self.speed)
+        self.speed = max(0.75, self.speed)
         super().update_movement(dt)
 
     #TODO decay speed over time
@@ -224,13 +242,13 @@ def drawCircle(radius):
         return circle
 
 class Planet(MovableObject):
-    def __init__(self, name, index):
+    def __init__(self, name, index, radius):
         super().__init__()
         self.attribute_name = name
         self.speed = 0
         self.planetNumber = index
+        self.radius = radius
 
-        self.radius = 1.0
         s = drawCircle(self.radius)
         self.geometry = s
 
@@ -242,26 +260,64 @@ class Planet(MovableObject):
 
         global player
         d_2 = np.sum((self.vec_pos - player.vec_pos)**2)
-        if d_2 < 1:
+        if d_2 < 0.2:
             
             plt.text(x=-SPACE_SIZE+9, y=SPACE_SIZE-9, s=f'GAME OVER')
             plt.pause(5)
             global is_running
             is_running = False
-        F = 9.82 / d_2*2
+        F = 9.82 * self.radius / d_2*2
         # TODO implement l2_normalize_vec2d
         F_vec = l2_normalize_vec2d(self.vec_pos - player.vec_pos)
         
         player.external_forces[self.planetNumber] = F * F_vec
 
 
+class EmissionParticle(MovableObject):
+    def __init__(self, directionVector, speed, position):
+        super().__init__()
+        self.speed = speed * .5
+        I = np.array([
+            [1, 0],
+            [0, 1],
+        ])
+
+        self.vec_pos = dot(position, I)
+
+        radius = np.random.uniform(0.15, 0.3)
+
+        s = drawCircle(radius)
+        self.geometry = s
+
+        directionChangeMatrix = np.array([
+            [np.random.uniform(-1.5, -0.5), 0],
+            [0, np.random.uniform(-1.5, -0.5)],
+        ])
+        self.vec_dir = dot(directionVector, directionChangeMatrix)
+        self.lifespan = 1
+    def update_movement(self, dt):
+        self.lifespan -= dt
+        super().update_movement(dt)
+        self.geometry = reduceEmmission(self.geometry)
+        self.speed -= dt * 0.6
+        if self.lifespan < 0:
+            self.geometry = clearMatrix(self.geometry)
+
+
+def createEmissionParticles(player):
+    particles = []
+    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+    print(particles)
+    return particles
 
 #TODO Planet
 
 player: Player = Player()
-zeme: Planet = Planet("zeme", 0)
-marss: Planet = Planet("marss", 1)
-jupiters: Planet = Planet("jupiters", 2)
+zeme: Planet = Planet("zeme", 0, 1)
+marss: Planet = Planet("marss", 1, 0.5)
+jupiters: Planet = Planet("jupiters", 2, 2)
 actors = [player, zeme, marss, jupiters]
 
 is_running = True
@@ -279,6 +335,10 @@ def press(event):
 
     elif event.key == ' ':
         player.activate_thrusters()
+        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+            
 
 def on_close(event):
     global is_running
