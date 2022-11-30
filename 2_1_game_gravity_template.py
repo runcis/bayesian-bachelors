@@ -21,21 +21,27 @@ def rotation_mat(degrees):
         [sin_x, cos_x, 0.0],
         [0.0, 0.0, 1.0]
     ])
-    #print("R[0], R[1]: ",R[0], R[1])
-    #C = translationForRotation(R)
-    #print("C : ",C)
-    #print("R : ",R)
     
     return R
 
-def translationForRotation(m):
-    T = np.array([
-        [0.1, 0.0, 0.0],
-        [0.0, 0.1, 0.0],
-        [0.0, 0.0, 0.1]
-    ])
+def translationForRotation(playerGeometry):
+    xSum = 0
+    ySum = 0
+    for i in range(len(playerGeometry)-1):
+        xSum += playerGeometry[i][0]
+        ySum += playerGeometry[i][1]
 
-    return m+T
+    xCentroid = xSum/3
+    yCentroid = ySum/3
+
+    xOffset = -xCentroid
+    yOffset = -yCentroid
+    
+    return np.array([
+        [1.0, 0.0, xOffset],
+        [0.0, 1.0, yOffset],
+        [0.0, 0.0, 1.0]
+    ])
 
 def translation_mat(dx, dy):
     T = np.array([
@@ -144,11 +150,11 @@ class MovableObject(object):
         self.vec_dir_init = np.array([0.0, 1.0])
         self.vec_dir = np.copy(self.vec_dir_init)
 
-        self.external_forces = np.zeros((3, 2)) # 3,2
-        self.speed = 0.6
+        self.external_forces = np.zeros((3, 2))
+        self.speed = 0.8
 
     def set_angle(self, angle):
-        self.__angle = angle # encapsulation
+        self.__angle = angle
         self.R = rotation_mat(angle)
 
         vec3d = vec2d_to_vec3d(self.vec_dir_init)
@@ -183,8 +189,9 @@ class MovableObject(object):
 
     def __update_transformation(self):
         self.T = translation_mat(self.vec_pos[0], self.vec_pos[1])
+        self.S = translationForRotation(self.geometry)
         self.C = dot(self.T, self.R)
-        #Add other transofrmations
+        self.C = dot(self.C, self.S)
 
 
     def draw(self): #virtual function, polymorhism
@@ -267,7 +274,6 @@ class Planet(MovableObject):
             global is_running
             is_running = False
         F = 9.82 * self.radius / d_2*2
-        # TODO implement l2_normalize_vec2d
         F_vec = l2_normalize_vec2d(self.vec_pos - player.vec_pos)
         
         player.external_forces[self.planetNumber] = F * F_vec
@@ -347,7 +353,7 @@ def on_close(event):
 fig, _ = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', press)
 fig.canvas.mpl_connect('close_event', on_close)
-dt = 1e-1
+dt = 1e-4
 
 last_time = time.time()
 while is_running:
