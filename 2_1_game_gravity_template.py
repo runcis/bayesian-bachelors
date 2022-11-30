@@ -50,8 +50,6 @@ def translation_mat(dx, dy):
         [0.0, 0.0, 1.0]
     ])
     return T
-    #T = np.zeros((3, 3))
-    #return T
 
 def scale_mat(figure):
     scaleReductionMatrix = np.array([
@@ -59,15 +57,6 @@ def scale_mat(figure):
         [0.0, 0.8]
     ])
     return dot(figure,scaleReductionMatrix)
-
-def reduceEmmission(figure):
-    scaleReductionMatrix = np.array([
-        [0.75, 0.0],
-        [0.0, 0.75]
-    ])
-    reducedMatrix = dot(figure, scaleReductionMatrix)
-    return reducedMatrix
-
     
 def clearMatrix(matrix):
     nullMatrix = np.array([
@@ -104,9 +93,6 @@ def dot(X, Y):
         product = product.flatten()
 
     return product
-
-    #Z = np.dot(X, Y)
-    #return Z
 
 
 def vec2d_to_vec3d(vec2d):
@@ -150,7 +136,7 @@ class MovableObject(object):
         self.vec_dir_init = np.array([0.0, 1.0])
         self.vec_dir = np.copy(self.vec_dir_init)
 
-        self.external_forces = np.zeros((3, 2))
+        self.external_forces = np.zeros((5, 2))
         self.speed = 0.8
 
     def set_angle(self, angle):
@@ -194,7 +180,7 @@ class MovableObject(object):
         self.C = dot(self.C, self.S)
 
 
-    def draw(self): #virtual function, polymorhism
+    def draw(self):
         x_values = []
         y_values = []
         for vec2d in self.geometry:
@@ -230,23 +216,21 @@ class Player(MovableObject):
         pass
 
     def update_movement(self, dt):
-        self.speed -= dt * 0.5
+        self.speed -= dt * 0.75
         self.speed = max(0.75, self.speed)
         super().update_movement(dt)
 
-    #TODO decay speed over time
-
 def drawCircle(radius):
         detail = 24
-        circle = [None] *detail
+        circle = []
         d = 0
         x = 0
         while d < 375:
-            circle[x] = [radius*np.cos(np.radians(d)), radius*np.sin(np.radians(d))]
+            circle.append([radius*np.cos(np.radians(d)), radius*np.sin(np.radians(d))])
             d +=375/detail
             x +=1
 
-        return circle
+        return np.array(circle)
 
 class Planet(MovableObject):
     def __init__(self, name, index, radius):
@@ -254,6 +238,7 @@ class Planet(MovableObject):
         self.attribute_name = name
         self.speed = 0
         self.planetNumber = index
+        print(radius)
         self.radius = radius
 
         s = drawCircle(self.radius)
@@ -280,9 +265,9 @@ class Planet(MovableObject):
 
 
 class EmissionParticle(MovableObject):
-    def __init__(self, directionVector, speed, position):
+    def __init__(self, directionVector, position):
         super().__init__()
-        self.speed = speed * .5
+        self.speed = .75
         I = np.array([
             [1, 0],
             [0, 1],
@@ -304,7 +289,7 @@ class EmissionParticle(MovableObject):
     def update_movement(self, dt):
         self.lifespan -= dt
         super().update_movement(dt)
-        self.geometry = reduceEmmission(self.geometry)
+        self.geometry = self.geometry * .75
         self.speed -= dt * 0.6
         if self.lifespan < 0:
             self.geometry = clearMatrix(self.geometry)
@@ -312,11 +297,10 @@ class EmissionParticle(MovableObject):
 
 def createEmissionParticles(player):
     particles = []
-    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
-    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
-    particles.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
-    print(particles)
-    return particles
+    particles.append(EmissionParticle(player.vec_dir, player.vec_pos))
+    particles.append(EmissionParticle(player.vec_dir, player.vec_pos))
+    particles.append(EmissionParticle(player.vec_dir, player.vec_pos))
+    return np.array(particles)
 
 #TODO Planet
 
@@ -341,9 +325,7 @@ def press(event):
 
     elif event.key == ' ':
         player.activate_thrusters()
-        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
-        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
-        actors.append(EmissionParticle(player.vec_dir, player.speed, player.vec_pos))
+        actors.extend(createEmissionParticles(player))
             
 
 def on_close(event):
@@ -356,6 +338,7 @@ fig.canvas.mpl_connect('close_event', on_close)
 dt = 1e-4
 
 last_time = time.time()
+zero_time = time.time()
 while is_running:
     plt.clf()
     plt.axis('off')
@@ -370,6 +353,13 @@ while is_running:
     for actor in actors: # polymorhism
         actor.update_movement(real_dt)
     last_time = time.time()
+
+    time_passed = last_time - zero_time
+    if time_passed > 5 and time_passed < 5.05 :
+        actors.append(Planet("new", 3, np.random.uniform(0.5, 2.5)))
+        
+    if time_passed > 15 and time_passed < 15.05 :
+        actors.append(Planet("new", 4, np.random.uniform(0.5, 2.5)))
 
     for actor in actors: # polymorhism
         actor.draw()
