@@ -52,8 +52,6 @@ while is_running:
     theta_1 = np.deg2rad(degrees1)
     theta_2 = np.deg2rad(degrees2)
 
-    
-
     plt.clf()
 
 
@@ -76,7 +74,6 @@ while is_running:
         plt.plot(np_joints[:, 0], np_joints[:, 1])
     plt.scatter(target_point[0], target_point[1], s=50, c='r')
 
-    #distance = 0.5*((point_2[0]-target_point[0])**2 + (point_2[1]-target_point[1])**2)
     distance = np.sum((target_point - point_2) **2 )/2
 
     plt.title(f'theta_1: {round(np.rad2deg(theta_1))} theta_2: {round(np.rad2deg(theta_2))} distance: {distance}')

@@ -5,12 +5,18 @@ import time
 import math
 matplotlib.use("TkAgg")
 
+
+### UI ATTRIBUTES ###
+
 import matplotlib.pyplot as plt
 plt.rcParams["figure.figsize"] = (7, 7) # size of window
 plt.ion()
 plt.style.use('dark_background')
 
 SPACE_SIZE = 10
+is_running = True
+
+### VECTOR AND MATRIX TRANSFORMATIONS ###
 
 def rotation_mat(degrees):
     rad = np.radians(degrees)
@@ -24,25 +30,6 @@ def rotation_mat(degrees):
     
     return R
 
-def translationForRotation(playerGeometry):
-    xSum = 0
-    ySum = 0
-    for i in range(len(playerGeometry)-1):
-        xSum += playerGeometry[i][0]
-        ySum += playerGeometry[i][1]
-
-    xCentroid = xSum/3
-    yCentroid = ySum/3
-
-    xOffset = -xCentroid
-    yOffset = -yCentroid
-    
-    return np.array([
-        [1.0, 0.0, xOffset],
-        [0.0, 1.0, yOffset],
-        [0.0, 0.0, 1.0]
-    ])
-
 def translation_mat(dx, dy):
     T = np.array([
         [1.0, 0.0, dx],
@@ -51,12 +38,13 @@ def translation_mat(dx, dy):
     ])
     return T
 
-def scale_mat(figure):
-    scaleReductionMatrix = np.array([
-        [0.4, 0.0],
-        [0.0, 0.8]
+def scale_mat(dx, dy):
+    T = np.array([
+        [dx, 0.0, 0.0],
+        [0.0, dy, 0.0],
+        [0.0, 0.0, 1.0]
     ])
-    return dot(figure,scaleReductionMatrix)
+    return T
     
 def clearMatrix(matrix):
     nullMatrix = np.array([
@@ -76,15 +64,13 @@ def dot(X, Y):
         Y = np.transpose(Y)
     
     X_rows = X.shape[0]
-    Y_rows = Y.shape[0]
     Y_columns = Y.shape[1]
 
     product = np.zeros((X_rows, Y_columns))
 
     for X_row in range(X_rows):
         for Y_column in range(Y_columns):
-            for Y_row in range(Y_rows):
-                product[X_row][Y_column] += X[X_row][Y_row] * Y[Y_row][Y_column]
+            product[X_row, Y_column] = np.sum(X[X_row,:] * Y[:, Y_column])
 
     if is_transposed:
         product = np.transpose(product)
@@ -119,6 +105,8 @@ def l2_normalize_vec2d(vec2d):
     normalized_vec2d = np.array([vec2d[0]/length, vec2d[1]/length])
     return normalized_vec2d
 
+### OBJECTS ###
+
 class MovableObject(object):
     def __init__(self):
         super().__init__()
@@ -131,6 +119,8 @@ class MovableObject(object):
         self.R = np.identity(3)
         self.S = np.identity(3)
         self.T = np.identity(3)
+        self.T_init = np.identity(3)
+
 
         self.vec_pos = np.zeros((2,))
         self.vec_dir_init = np.array([0.0, 1.0])
@@ -154,7 +144,7 @@ class MovableObject(object):
 
     def update_movement(self, dt):
 
-        # TODO handle borders (fly out other side)
+        # handle borders (fly out other side)
         if self.vec_pos[1] > 10:
             self.vec_pos[1] = -10
 
@@ -175,10 +165,12 @@ class MovableObject(object):
 
     def __update_transformation(self):
         self.T = translation_mat(self.vec_pos[0], self.vec_pos[1])
-        self.S = translationForRotation(self.geometry)
-        self.C = dot(self.T, self.R)
+        
+        self.C = np.identity(3)
+        self.C = dot(self.C, self.T)
+        self.C = dot(self.C, self.R)
         self.C = dot(self.C, self.S)
-
+        self.C = dot(self.C, self.T_init)
 
     def draw(self):
         x_values = []
@@ -193,7 +185,6 @@ class MovableObject(object):
 
         plt.plot(x_values, y_values)
 
-
 class Player(MovableObject):
     def __init__(self):
         super().__init__()
@@ -206,9 +197,12 @@ class Player(MovableObject):
             [-1, 0]
         ])
 
-        self.geometry = scale_mat(self.geometry)
         self.vec_pos = np.array([0.0, 0.0])
         self.speed = 0.75
+
+        self.T_init = translation_mat(0 , -0.5)
+        self.S = scale_mat(0.2, 0.8)
+
 
     def activate_thrusters(self):
         self.speed += 1.3
@@ -248,21 +242,12 @@ class Planet(MovableObject):
         self.speed = 0
     
     def update_movement(self, dt):
+        if isCollided(self, player):
+            closeWithGameOver()
+            
         super().update_movement(dt)
 
-        global player
-        d_2 = np.sum((self.vec_pos - player.vec_pos)**2)
-        if d_2 < 0.2:
-            
-            plt.text(x=-SPACE_SIZE+9, y=SPACE_SIZE-9, s=f'GAME OVER')
-            plt.pause(5)
-            global is_running
-            is_running = False
-        F = 9.82 * self.radius / d_2*2
-        F_vec = l2_normalize_vec2d(self.vec_pos - player.vec_pos)
-        
-        player.external_forces[self.planetNumber] = F * F_vec
-
+        updateForceOnPlayer(self)
 
 class EmissionParticle(MovableObject):
     def __init__(self, directionVector, position):
@@ -294,6 +279,27 @@ class EmissionParticle(MovableObject):
         if self.lifespan < 0:
             self.geometry = clearMatrix(self.geometry)
 
+### METHODS ###
+
+def isCollided(firstObject:MovableObject, secondObject:MovableObject):
+    d_2 = distanceBetweenTwoObjects(firstObject.vec_pos, secondObject.vec_pos)
+    if d_2 < 0.2:
+        return True
+    return False
+
+def distanceBetweenTwoObjects(pos1, pos2):
+    return np.sum((pos1 - pos2)**2)/2
+
+def closeWithGameOver():
+    plt.text(x=-SPACE_SIZE+9, y=SPACE_SIZE-9, s=f'GAME OVER')
+    plt.pause(5)
+    is_running = False
+
+def updateForceOnPlayer(self:MovableObject):
+    F = 9.82 * self.radius / distanceBetweenTwoObjects(self.vec_pos, player.vec_pos)*2
+    F_vec = l2_normalize_vec2d(self.vec_pos - player.vec_pos)
+    player.external_forces[self.planetNumber] = F * F_vec
+
 
 def createEmissionParticles(player):
     particles = []
@@ -302,17 +308,7 @@ def createEmissionParticles(player):
     particles.append(EmissionParticle(player.vec_dir, player.vec_pos))
     return np.array(particles)
 
-#TODO Planet
-
-player: Player = Player()
-zeme: Planet = Planet("zeme", 0, 1)
-marss: Planet = Planet("marss", 1, 0.5)
-jupiters: Planet = Planet("jupiters", 2, 2)
-actors = [player, zeme, marss, jupiters]
-
-is_running = True
 def press(event):
-    global is_running, player
     print('press', event.key)
     if event.key == 'escape':
         is_running = False # quits app
@@ -332,6 +328,14 @@ def on_close(event):
     global is_running
     is_running = False
 
+### GAMESPACE INITIALIZATIONS ###
+
+player: Player = Player()
+zeme: Planet = Planet("zeme", 0, 1)
+marss: Planet = Planet("marss", 1, 0.5)
+jupiters: Planet = Planet("jupiters", 2, 2)
+actors = [player, zeme, marss, jupiters]
+
 fig, _ = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', press)
 fig.canvas.mpl_connect('close_event', on_close)
@@ -339,6 +343,9 @@ dt = 1e-4
 
 last_time = time.time()
 zero_time = time.time()
+
+### GAME LOOP ###
+
 while is_running:
     plt.clf()
     plt.axis('off')
