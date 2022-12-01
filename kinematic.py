@@ -43,6 +43,9 @@ def on_close(event):
     global is_running
     is_running = False
 
+def distanceBetweenTwoPoints(pos1, pos2):
+    return np.sum((pos1 - pos2)**2)/2
+
 fig, _ = plt.subplots()
 fig.canvas.mpl_connect('key_press_event', press)
 fig.canvas.mpl_connect('close_event', on_close)
@@ -74,7 +77,7 @@ while is_running:
         plt.plot(np_joints[:, 0], np_joints[:, 1])
     plt.scatter(target_point[0], target_point[1], s=50, c='r')
 
-    distance = np.sum((target_point - point_2) **2 )/2
+    distance = distanceBetweenTwoPoints(target_point, point_2)
 
     plt.title(f'theta_1: {round(np.rad2deg(theta_1))} theta_2: {round(np.rad2deg(theta_2))} distance: {distance}')
 

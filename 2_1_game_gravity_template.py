@@ -65,6 +65,8 @@ def dot(X, Y):
     
     X_rows = X.shape[0]
     Y_columns = Y.shape[1]
+    
+    product = np.zeros((X_rows, Y_columns))
 
     for X_row in range(X_rows):
         for Y_column in range(Y_columns):
