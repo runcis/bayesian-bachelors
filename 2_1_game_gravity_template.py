@@ -66,8 +66,6 @@ def dot(X, Y):
     X_rows = X.shape[0]
     Y_columns = Y.shape[1]
 
-    product = np.zeros((X_rows, Y_columns))
-
     for X_row in range(X_rows):
         for Y_column in range(Y_columns):
             product[X_row, Y_column] = np.sum(X[X_row,:] * Y[:, Y_column])
@@ -293,6 +291,7 @@ def distanceBetweenTwoObjects(pos1, pos2):
 def closeWithGameOver():
     plt.text(x=-SPACE_SIZE+9, y=SPACE_SIZE-9, s=f'GAME OVER')
     plt.pause(5)
+    global is_running
     is_running = False
 
 def updateForceOnPlayer(self:MovableObject):
@@ -311,6 +310,7 @@ def createEmissionParticles(player):
 def press(event):
     print('press', event.key)
     if event.key == 'escape':
+        global is_running
         is_running = False # quits app
 
     elif event.key == 'right':
