@@ -48,7 +48,8 @@ fig.canvas.mpl_connect('key_press_event', press)
 
 length_joint = 2.0
 theta_1 = np.deg2rad(0)
-theta_2 = np.deg2rad(10)
+theta_2 = np.deg2rad(0)
+theta_3 = np.deg2rad(0)
 alpha = 1e-2
 
 
@@ -61,33 +62,38 @@ while is_running:
     dR1 = d_rotation(theta_1)
     R2 = rotation(theta_2)
     dR2 = d_rotation(theta_2)
+    R3 = rotation(theta_3)
+    dR3 = d_rotation(theta_3)
 
     point_1 = np.dot(R1,t)
     point_2 = point_1 + np.dot(R1, np.dot(R2, t))
-
-# check if didn't go below
-
-    if point_1[1] < 0:
-        point_1[1] = 0
-
-    if point_2[1] < 0:
-        point_2[1] = 0
-
+    point_3 = point_2 + np.dot(R2, np.dot(R3, t))
    
     joints = []
     joints.append(anchor_point)
     joints.append(point_1)
     joints.append(point_2)
+    joints.append(point_3)
 
     np_joints = np.array(joints)
 
-    d_theta_1 = np.sum(2 * (point_2 - target_point) * (dR1 @ t + dR1 @ R2 @ t))
-    theta_1 -= d_theta_1 * alpha
+    d_theta_1 = np.sum(2 * (point_3 - target_point) * (dR1 @ t + dR1 @ R2 @ t))
+    
+    # check if didn't go below
+    # TODO change this doesn't seem right
+    if (theta_1 < 1.5 and theta_1 > -1.5):
+        theta_1 -= d_theta_1 * alpha
+    else:
+        theta_1 += d_theta_1 * alpha
+    
 
-    d_theta_2 = np.sum(2 * (point_2 - target_point) * (R1 @ dR2 @ t))
+    d_theta_2 = np.sum(2 * (point_3 - target_point) * (R1 @ dR2 @ t))
+    theta_2 -= d_theta_2 * alpha
+
+    d_theta_2 = np.sum(2 * (point_3 - target_point) * (R2 @ dR3 @ t))
     theta_2 -= d_theta_2 * alpha
         
-    loss = np.mean((target_point - point_2) **2)
+    loss = np.mean((target_point - point_3) **2)
     d_loss = loss/dR2
 
     if len(np_joints):
