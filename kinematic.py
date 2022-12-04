@@ -85,22 +85,21 @@ while is_running:
         theta_1 -= d_theta_1 * alpha
     else:
         theta_1 += d_theta_1 * alpha
-    
 
     d_theta_2 = np.sum(2 * (point_3 - target_point) * (R1 @ dR2 @ t))
     theta_2 -= d_theta_2 * alpha
 
-    d_theta_2 = np.sum(2 * (point_3 - target_point) * (R2 @ dR3 @ t))
-    theta_2 -= d_theta_2 * alpha
+    d_theta_3 = np.sum(2 * (point_3 - target_point) * (R2 @ dR3 @ t)  )
+    theta_3 -= d_theta_3 * alpha
         
     loss = np.mean((target_point - point_3) **2)
-    d_loss = loss/dR2
+    d_loss = loss/dR3
 
     if len(np_joints):
         plt.plot(np_joints[:, 0], np_joints[:, 1])
     plt.scatter(target_point[0], target_point[1], s=50, c='r')
     
-    plt.title(f'theta_1: {round(np.rad2deg(theta_1))} theta_2: {round(np.rad2deg(theta_2))} loss = {d_loss}')
+    plt.title(f'd_loss = {d_loss}')
     plt.xlim(-5, 5)
     plt.ylim(0, 10)
     plt.draw()
