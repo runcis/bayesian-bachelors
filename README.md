@@ -1,3 +1,126 @@
+# Task 4: Regressija ar svaru apmacibas modeli (4.7)
+
+No video nokopēju SGD algoritmu, likās ļoti sarežģīts un nedomāju ka pats tādu būtu uztaisijis ar pirmo mēģinājumu. 
+Modeļa implemnetācija un svaru apmacibas augstakā līmenī liekas skaidra, bet kļuva grūtāk, kad sāku pildīt mājasdrabu (vairāku dimensiju matricu parametri).
+
+Man ir jautājumi:
+1. Kā var saprast kurām matricām vajag izmantot dot produktu bet kuras var vienkārši sareizināt?
+![when-to-multiply](media/when-to-multiply.PNG)
+šeit es biju confused jo shape ir sekojoši, d_loss - (4,1), layer_3 - (8,1,1) before transformation - (8,1), layer_1 - (4,1), layer_2 - (4,8).
+Skatoties uz shape es pieņemtu ka šīs matricas nevar sareizināt, bet pec tam kad ir izveidots 4x8 dot produkts, mums izdodas sareizināt 4x8 ar 4x1 un 4x8. kā?
+
+### List of implemented functions
+
+1. Linear function
+
+~~~
+def linear(W, b, x):
+    prod_W = np.squeeze(W.T @np.expand_dims(x, axis=-1), axis=-1)
+    return prod_W + b
+~~~
+
+2. Derivatives for each variable:
+
+~~~
+def dW_linear(W, b, x):
+    return x
+
+def db_linear(W, b, x):
+    return 1
+
+def dx_linear(W, b, x):
+    return W
+~~~
+
+3. Loss functions:
+
+~~~
+def dy_prim_loss_mae(y_prim, y):
+    return (y_prim - y) / (np.abs(y_prim - y) + 1e-8)
+
+def dW_1_loss(x, W_1, b_1, W_2, b_2, y_prim, y):
+    d_layer_1 = dW_linear(W_1, b_1, x)
+    d_layer_2 = dx_sigmoid(linear(W_1, b_1, x))
+    d_layer_3 = np.expand_dims(dx_linear(W_2, b_2, sigmoid(linear(W_1, b_1, x))), axis=-1)
+    d_loss = dy_prim_loss_mae(y_prim, y)
+    d_dot_3 = np.squeeze(d_loss @ d_layer_3, axis=-1).T
+    return d_dot_3 * d_layer_2 * d_layer_1
+
+def db_1_loss(x, W_1, b_1, W_2, b_2, y_prim, y):
+    d_layer_1 = db_linear(W_1, b_1, x)
+    d_layer_2 = dx_sigmoid(linear(W_1, b_1, x))
+    d_layer_3 = np.expand_dims(dx_linear(W_2, b_2, sigmoid(linear(W_1, b_1, x))), axis=-1)
+    d_loss = dy_prim_loss_mae(y_prim, y)
+    d_dot_3 = np.squeeze(d_loss @ d_layer_3, axis=-1).T
+    return d_dot_3 * d_layer_2 * d_layer_1
+
+def dW_2_loss(x, W_1, b_1, W_2, b_2, y_prim, y):
+    d_layer_3 = dW_linear(W_2, b_2, sigmoid(linear(W_1, b_1, x)))
+    d_loss = dy_prim_loss_mae(y_prim, y)
+    return d_loss * d_layer_3
+
+def db_2_loss(x, W_1, b_1, W_2, b_2, y_prim, y):
+    d_layer_3 = db_linear(W_2, b_2, sigmoid(linear(W_1, b_1, x)))
+    d_loss = dy_prim_loss_mae(y_prim, y)
+    return d_loss * d_layer_3
+~~~
+
+4. SGD implementation
+
+~~~
+dW_1 = np.sum(dW_1_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
+    dW_2 = np.sum(dW_2_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
+    db_1 = np.sum(db_1_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
+    db_2 = np.sum(db_2_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
+
+    W_1 -= dW_1 * learning_rate
+    W_2 -= dW_2 * learning_rate
+    b_1 -= db_1 * learning_rate
+    b_2 -= db_2 * learning_rate
+~~~
+
+5. Result
+
+![regression-with-weights](media/regression-with-weights.PNG)
+
+
+# Task 3: Regression for comparing mae vs mse (4.6)
+
+Vienkārši un saprotami priekš viendimensionālas datu kopas.
+
+### List of implemented functions
+
+1. Sigmoid function
+
+~~~
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+~~~
+
+2. Loss mae
+
+~~~
+def loss_mae(y_prim, y):
+    return np.sum(np.abs(y_prim - y))
+~~~
+
+2. Loss mse
+
+~~~
+def loss_mse(y_prim, y):
+    return np.mean(np.sum((y_prim - y)**2))
+~~~
+
+2. Model
+
+~~~
+def model(x, W_1, b_1, W_2, b_2):
+    layer_1 = linear(W_1, b_1, x)
+    layer_2 = sigmoid(layer_1)
+    layer_3 = linear(W_2, b_2, layer_2)
+    return layer_3
+~~~
+
 # Task 2: Inverse kintetics
 
 Kopumā gāja labi, nebija problemas izveidot atvasinājuma funkcijas un rezultāts sanāca veiksmīgs.
@@ -5,6 +128,7 @@ Kopumā gāja labi, nebija problemas izveidot atvasinājuma funkcijas un rezult�
 Man ir 2 jautājumi:
 1. kāpēc ir nepieciešama loss funkcija
 2. Kā īstenot roku nepāriešanu pāri otrai? (Es ilgi mēģināju bet nesanāca)
+
 
 ### List of implemented functions
 
