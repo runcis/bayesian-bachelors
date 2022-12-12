@@ -93,7 +93,8 @@ while is_running:
     theta_3 -= d_theta_3 * alpha
         
     loss = np.mean((target_point - point_3) **2)
-    d_loss = loss/dR3
+    d_loss = 2*np.mean(target_point - point_3)
+
 
     if len(np_joints):
         plt.plot(np_joints[:, 0], np_joints[:, 1])
