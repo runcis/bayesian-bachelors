@@ -3,7 +3,7 @@
 Nesanāk līdz galam. Liekas ka modeļa izveide sanāca un ir vienkārša(ja pareizi sapratu). Izmantojot debugger, sanāca progress ar modeļa izveidi un loss funkciju.
 Ir vairāki jautājumi, primāri par SGD. Palielam apstājos pie d_dot_3 = d_loss @ d_layer_3 - nezinu kā tālāk risināt.
 
-1. Jautājums: Kā noteikt cik lielas matricas vajag izmantot b_n un W_n? 
+1. Jautājums: Kā noteikt cik lielas matricas vajag izmantot b_n un W_n? Kā vispār domāt par matricu izmēriem caur algoritma izpildi? 
 
 Es pievienoju papildu parametrus X matricai:
 ~~~
