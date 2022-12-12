@@ -1,17 +1,92 @@
+# Task 5: Regressija ar svaru apmacibas modeli ar vairākiem parametriem (4.8)
+
+Nesanāk līdz galam. Liekas ka modeļa izveide sanāca un ir vienkārša(ja pareizi sapratu). Izmantojot debugger, sanāca progress ar modeļa izveidi un 
+Ir vairāki jautājumi, primāri par SGD. Palielam apstājos pie d_dot_3 = d_loss @ d_layer_3 - nezinu kā tālāk risināt.
+
+1. Jautājums: Kā noteikt cik lielas matricas vajag izmantot b_n un W_n? 
+
+Es pievienoju papildu parametrus X matricai:
+~~~
+X = np.array([[0.0, 2.0], [2.0, 2.0], [5.0, 2.5], [11.0, 3.0]]) # +2000
+Y = np.array([2.1, 4.0, 5.5, 8.9]) # *1000
+
+X = np.expand_dims(X, axis=-1) # in_features = 1
+Y = np.expand_dims(Y, axis=-1) # out_features = 1
+~~~
+
+Un tad es izveidoju "neironus":
+~~~
+W_1 = np.zeros((1,8))
+b_1 = np.zeros((8,))
+W_2 = np.zeros((8,8))
+b_2 = np.zeros((8, ))
+W_3 = np.zeros((8,1))
+b_3 = np.zeros((1, ))
+~~~
+Es gan galīgi nesaprotu kā noteikt cik daudz viņus kura slānī vajag. Es uz random izvēlējos šīs vērtības kas ir, bet mainot tās, visu laiku sastopos ar erroriem talāk kodā - kas saistīts ar dot produktam neatbilstošiem izmēriem. Piemēram šeit:
+![error-dot-product-sizes](media/error-dot-product-sizes.PNG)
+d_loss ir 4x2x1 un d_layer_3 ir 8x8x1
+
+2. Jautājums: Kā saprast, kur vajag veikt matricu pārveidojumus?
+
+Palielam tas pats jautājums, nesaprotu īsti, kā veikt pārveidojumus, lai errori kā augšējais tiktu atrisināti. Manā uztverē ir sekojošās vietas kur to darīt - lineārās funkcijas laikā, modeļa soļu laikā vai loss funkcijās.
+
+### List of implemented functions
+
+3. MSE and its derivative
+
+~~~
+def loss_mse(y_prim, y):
+    return np.mean(np.sum((y_prim - y)**2))
+~~~
+
+jeb pārveidots lai nemestos errori strādājot ar matricām: 
+
+~~~
+def loss_mse(y_prim, y):
+    return np.mean(np.sum((y_prim - np.expand_dims(y, axis=-1))**2))
+
+def dy_prim_loss_mse(y_prim, y):
+    return 2*(y_prim - np.expand_dims(y, axis=-1)) #or is it 2*np.mean(np.sum(y_prim - y)) ?
+~~~
+
+Var rerdzēt mana šaubas par pareizo pierakstu, debagojot, atšķirība rezultātā nav.
+
+4. Model implementation
+
+~~~
+def linear(W, b, x):
+    prod_W = np.squeeze(W.T @ np.expand_dims(x, axis =-1), axis =-1)
+    return prod_W + b
+
+def tanh(x):
+    result = (np.exp(x)-np.exp(-x))/np.exp(x)+np.exp(-x)
+    return result
+
+def model(x, W_1, b_1, W_2, b_2, W_3, b_3):
+    layer_1 = linear(W_1, b_1, x)
+    layer_2 = tanh(layer_1)
+    layer_3 = linear(W_2, b_2, layer_2)
+    layer_4 = tanh(layer_3)
+    layer_5 = linear(W_3, b_3, layer_4)
+    return layer_5
+~~~
+
 # Task 4: Regressija ar svaru apmacibas modeli (4.7)
 
 No video nokopēju SGD algoritmu, likās ļoti sarežģīts un nedomāju ka pats tādu būtu uztaisijis ar pirmo mēģinājumu. 
 Modeļa implemnetācija un svaru apmacibas augstakā līmenī liekas skaidra, bet kļuva grūtāk, kad sāku pildīt mājasdrabu (vairāku dimensiju matricu parametri).
 
-Man ir jautājumi:
-1. Kā var saprast kurām matricām vajag izmantot dot produktu bet kuras var vienkārši sareizināt?
+
+1. Jautājums Kā var saprast kurām matricām vajag izmantot dot produktu bet kuras var vienkārši sareizināt?
 ![when-to-multiply](media/when-to-multiply.PNG)
 šeit es biju confused jo shape ir sekojoši, d_loss - (4,1), layer_3 - (8,1,1) before transformation - (8,1), layer_1 - (4,1), layer_2 - (4,8).
 Skatoties uz shape es pieņemtu ka šīs matricas nevar sareizināt, bet pec tam kad ir izveidots 4x8 dot produkts, mums izdodas sareizināt 4x8 ar 4x1 un 4x8. kā?
 
+
 ### List of implemented functions
 
-1. Linear function
+2. Linear function
 
 ~~~
 def linear(W, b, x):
@@ -19,7 +94,7 @@ def linear(W, b, x):
     return prod_W + b
 ~~~
 
-2. Derivatives for each variable:
+3. Derivatives for each variable:
 
 ~~~
 def dW_linear(W, b, x):
@@ -32,7 +107,7 @@ def dx_linear(W, b, x):
     return W
 ~~~
 
-3. Loss functions:
+4. Loss functions:
 
 ~~~
 def dy_prim_loss_mae(y_prim, y):
@@ -65,7 +140,7 @@ def db_2_loss(x, W_1, b_1, W_2, b_2, y_prim, y):
     return d_loss * d_layer_3
 ~~~
 
-4. SGD implementation
+5. SGD implementation
 
 ~~~
 dW_1 = np.sum(dW_1_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
@@ -79,7 +154,7 @@ dW_1 = np.sum(dW_1_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
     b_2 -= db_2 * learning_rate
 ~~~
 
-5. Result
+6. Result
 
 ![regression-with-weights](media/regression-with-weights.PNG)
 
