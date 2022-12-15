@@ -2,16 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 X = np.array([[0.0, 2.0], [2.0, 2.0], [5.0, 2.5], [11.0, 3.0]]) # +2000
-Y = np.array([2.1, 4.0, 5.5, 8.9]) # *1000
+Y = np.array([[2.1], [4.0], [5.5], [8.9]]) # *1000
 
-X = np.expand_dims(X, axis=-1) # in_features = 2?
 Y = np.expand_dims(Y, axis=-1) # out_features = 1
 
-W_1 = np.zeros((1,8))
+W_1 = np.zeros((2,8))
 b_1 = np.zeros((8,))
-W_2 = np.zeros((8,8))
-b_2 = np.zeros((8, ))
-W_3 = np.zeros((8,1))
+W_2 = np.zeros((8,6))
+b_2 = np.zeros((6, ))
+W_3 = np.zeros((6,1))
 b_3 = np.zeros((1, ))
 
 def linear(W, b, x):
@@ -19,7 +18,11 @@ def linear(W, b, x):
     return prod_W + b
 
 def tanh(x):
-    result = (np.exp(x)-np.exp(-x))/np.exp(x)+np.exp(-x)
+    result = (np.exp(x)-np.exp(-x))/(np.exp(x)+np.exp(-x))
+    return result
+
+def dx_tanh(x):
+    result = (4 * np.exp(2*x))/((np.exp(2*x) + 1) ** 2)
     return result
 
 def sigmoid(x):

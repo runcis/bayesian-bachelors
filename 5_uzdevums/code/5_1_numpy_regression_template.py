@@ -26,10 +26,13 @@ class Dataset:
                 progress=True
             )
         with open(f'{path_dataset}', 'rb') as fp:
+            any_data = pickle.load(fp)
             self.X, self.Y, self.labels = pickle.load(fp)
 
         self.X = np.array(self.X)
-        #TODO normalize data
+        X_max = np.max(self.X, axis=0)
+        X_min = np.min(self.X, axis=0)
+        self.X = (self.X - (X_max + X_min) * 0.5) /(X_max - X_min) * 0.5
 
         self.Y = np.array(self.Y)
         #TODO normalize data
@@ -58,12 +61,19 @@ class DataLoader:
         return (self.idx_end - self.idx_start - self.batch_size) // self.batch_size
 
     def __iter__(self):
-        #TODO
+    
+        self.idx_batch = 0
         return self
 
     def __next__(self):
-        #TODO
-        return 0
+        if self.idx_batch > len(self):
+            raise StopIteration()
+        idx_start = self.idx_batch * self.batch_size + self.idx_start
+        idx_end = idx_start + self.batch_size
+        x, y = self.dataset[idx_start:idx_end]
+        y = np.expand_dims(Y, axis =-1)
+        self.idx_batch += 1
+        return x, y
 
 
 dataset_full = Dataset()
@@ -81,6 +91,9 @@ dataloader_test = DataLoader(
     idx_end=len(dataset_full),
     batch_size=BATCH_SIZE
 )
+
+for x,y in dataloader_train:
+    print(x, y)
 
 
 class Variable:
