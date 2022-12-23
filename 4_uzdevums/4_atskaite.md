@@ -1,35 +1,31 @@
 # Task 4.2: Regresija ar svaru apmacibas modeli ar vairākiem parametriem (4.8)
 
-Nesanāk līdz galam. Liekas ka modeļa izveide sanāca un ir vienkārša(ja pareizi sapratu). Izmantojot debugger, sanāca progress ar modeļa izveidi un loss funkciju.
-Ir vairāki jautājumi, primāri par SGD. Palielam apstājos pie d_dot_3 = d_loss @ d_layer_3 - nezinu kā tālāk risināt.
+Atrisināju, lai tiek uzģenerēts grafiks, bet šaubos vai ir pareizi.
 
-1. Jautājums: Kā noteikt cik lielas matricas vajag izmantot b_n un W_n? Kā vispār domāt par matricu izmēriem caur algoritma izpildi? 
+Velaizporojam paris jautajumi: 
 
-Es pievienoju papildu parametrus X matricai:
-~~~
-X = np.array([[0.0, 2.0], [2.0, 2.0], [5.0, 2.5], [11.0, 3.0]]) # +2000
-Y = np.array([2.1, 4.0, 5.5, 8.9]) # *1000
+Es nesaprotu kāpēc šie ir adevkāti back-propogation funkcijas:
+    layer_1 = linear(W_1, b_1, x)
+    layer_2 = tanh(layer_1)
+    layer_3 = linear(W_2, b_2, layer_2)
+    layer_4 = tanh(layer_3)
+    layer_5 = linear(W_3, b_3, layer_4)
 
-X = np.expand_dims(X, axis=-1) # in_features = 1
-Y = np.expand_dims(Y, axis=-1) # out_features = 1
-~~~
 
-Un tad es izveidoju "neironus":
-~~~
-W_1 = np.zeros((1,8))
-b_1 = np.zeros((8,))
-W_2 = np.zeros((8,8))
-b_2 = np.zeros((8, ))
-W_3 = np.zeros((8,1))
-b_3 = np.zeros((1, ))
-~~~
-Es gan galīgi nesaprotu kā noteikt cik daudz viņus kura slānī vajag. Es uz random izvēlējos šīs vērtības kas ir, bet mainot tās, visu laiku sastopos ar erroriem talāk kodā - kas saistīts ar dot produktam neatbilstošiem izmēriem. Piemēram šeit:
-![error-dot-product-sizes](media/error-dot-product-sizes.PNG)
-d_loss ir 4x2x1 un d_layer_3 ir 8x8x1
+    d_layer_1 = dW_linear(W_1, b_1, x)
+    d_layer_2_non_lin = dx_tanh(layer_1)
 
-2. Jautājums: Kā saprast, kur vajag veikt matricu pārveidojumus?
+    d_layer_3 = dx_linear(W_2, b_2, layer_4)
+    d_layer_3_non_lin = dx_tanh(layer_3)
+    d_layer_4 = dx_linear(W_3, b_3, layer_5)
+    d_loss = dy_prim_loss_mse(y_prim, y)
 
-Palielam tas pats jautājums, nesaprotu īsti, kā veikt pārveidojumus, lai errori kā augšējais tiktu atrisināti. Manā uztverē ir sekojošās vietas kur to darīt - lineārās funkcijas laikā, modeļa soļu laikā vai loss funkcijās.
+Kāpēc layer_1 tiek iegūts atvasinot to pašu fiju: linear(W_1, b_1, x) > dW_linear(W_1, b_1, x), bet d_layer_3 tiek iegūts atvasinot citu layer:
+linear(W_2, b_2, layer_2) > dx_linear(W_2, b_2, layer_4). Tas pats notiek d_layer_4. Kapēc tā?
+
+
+kapec line 91 vajag transpose? Kā var noteikt ka to vajag?
+
 
 ### List of implemented functions
 
@@ -71,6 +67,10 @@ def model(x, W_1, b_1, W_2, b_2, W_3, b_3):
     layer_5 = linear(W_3, b_3, layer_4)
     return layer_5
 ~~~
+
+Result:
+
+![regression-4_8_result](media/regression-4_8_result.PNG)
 
 # Task 4.1: Regressija ar svaru apmacibas modeli (4.7)
 

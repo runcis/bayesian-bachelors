@@ -107,7 +107,7 @@ def dx_linear(W, b, x):
     return W
 ~~~
 
-4. Loss functions:
+4. Back propogation:
 
 ~~~
 def dy_prim_loss_mae(y_prim, y):

@@ -12,7 +12,7 @@ plt.style.use('dark_background')
 
 LEARNING_RATE = 1e-2
 BATCH_SIZE = 16
-TRAIN_TEST_SPLIT = 0.7
+TRAIN_TEST_SPLIT = 0.75
 
 class Dataset:
     def __init__(self):
@@ -26,8 +26,8 @@ class Dataset:
                 progress=True
             )
         with open(f'{path_dataset}', 'rb') as fp:
-            any_data = pickle.load(fp)
-            self.X, self.Y, self.labels = pickle.load(fp)
+            data = pickle.load(fp)
+            self.X, self.Y, self.labels = data
 
         self.X = np.array(self.X)
         X_max = np.max(self.X, axis=0)
@@ -35,7 +35,10 @@ class Dataset:
         self.X = (self.X - (X_max + X_min) * 0.5) /(X_max - X_min) * 0.5
 
         self.Y = np.array(self.Y)
-        #TODO normalize data
+        Y_max = np.max(self.Y)
+        Y_min = np.min(self.Y)
+        self.Y = (self.Y - (Y_max + Y_min) * 0.5) /(Y_max - Y_min) * 0.5
+        self.Y = self.Y[:,0] # dadu kopā par vienu parametru par daudz
 
     def __len__(self):
         return len(self.X)
@@ -71,7 +74,7 @@ class DataLoader:
         idx_start = self.idx_batch * self.batch_size + self.idx_start
         idx_end = idx_start + self.batch_size
         x, y = self.dataset[idx_start:idx_end]
-        y = np.expand_dims(Y, axis =-1)
+        y = y[:, np.newaxis] # tas pats kas: y = np.expand_dims(y, axis=-1)
         self.idx_batch += 1
         return x, y
 
@@ -92,9 +95,6 @@ dataloader_test = DataLoader(
     batch_size=BATCH_SIZE
 )
 
-for x,y in dataloader_train:
-    print(x, y)
-
 
 class Variable:
     def __init__(self, value, grad=None):
@@ -106,20 +106,33 @@ class Variable:
 
 class LayerLinear:
     def __init__(self, in_features: int, out_features: int):
-        self.W =  Variable = None # TODO
-        self.b: Variable = None
+        self.W:  Variable = Variable(
+            value=np.random.uniform(low=-1, size=(in_features, out_features)),
+            grad=np.zeros(shape=(BATCH_SIZE, in_features, out_features))
+        )
+        self.b: Variable = Variable(
+            value=np.zeros(shape=(out_features,)),
+            grad=np.zeros(shape=(BATCH_SIZE, out_features))
+        )
         self.x: Variable = None
         self.output: Variable = None
 
     def forward(self, x: Variable):
         self.x = x
-        self.output = None # TODO
+    
+        self.output = Variable(
+            np.squeeze(self.W.value.T @ np.expand_dims(x.value, axis=-1), axis=-1) + self.b.value
+        )
         return self.output
 
     def backward(self):
-        self.b.grad += 1 #TODO chain next function grad
-        self.W.grad += 1 #TODO
-        self.x.grad += 1 #TODO
+        self.b.grad += 1 * self.output.grad
+
+        #self.W.grad += np.expand_dims(self.x.value, axis=-1) @ np.expand_dims(self.output.grad, axis=-2)
+        #self.x.grad += np.squeeze(self.W.value @ np.expand_dims(self.output.grad, axis =-1),axis =-1)
+        self.W.grad += self.x.value[:, :, np.newaxis] @ self.output.grad[:, np.newaxis, :]
+        tempGrad = self.W.value @ self.output.grad[:, :, np.newaxis]
+        self.x.grad += tempGrad[:, :, 0]
 
 class LayerSigmoid():
     def __init__(self):
@@ -127,13 +140,12 @@ class LayerSigmoid():
         self.output = None
 
     def forward(self, x: Variable):
-        self.x = x #TODO
-        self.output = None
+        self.x = x
+        self.output = Variable(1.0 / (1.0 + np.exp(-x.value)))
         return self.output
 
     def backward(self):
-        self.x.grad += 1 #TODO
-
+        self.x.grad += self.output.value * (1.0 - self.output.value) * self.output.grad
 
 class LayerReLU:
     def __init__(self):
@@ -157,11 +169,11 @@ class LossMSE():
     def forward(self, y: Variable, y_prim: Variable):
         self.y = y
         self.y_prim = y_prim
-        loss = 0 #TODO
+        loss = np.mean(np.sum((y.value - y_prim.value)**2))
         return loss
 
     def backward(self):
-        self.y_prim.grad += 1 #TODO
+        self.y_prim.grad += -2*(self.y.value - self.y_prim.value)
 
 
 class LossMAE():
@@ -172,30 +184,40 @@ class LossMAE():
     def forward(self, y: Variable, y_prim: Variable):
         self.y = y
         self.y_prim = y_prim
-        loss = 0 #TODO
+        loss = np.mean(np.abs(y.value - y_prim.value))
         return loss
 
     def backward(self):
-        self.y_prim.grad += 1 #TODO
+        self.y_prim.grad += -(self.y.value - self.y_prim.value) / (np.abs(self.y.value - self.y_prim.value) + 1e-8)
 
 class Model:
     def __init__(self):
         self.layers = [
-            #TODO
+            LayerLinear(in_features=6, out_features=8), #izmainiju uz 6 in features nevis
+            LayerSigmoid(),
+            LayerLinear(in_features=8, out_features=12),
+            LayerSigmoid(),
+            LayerLinear(in_features=12, out_features=7),
+            LayerSigmoid(),
+            LayerLinear(in_features=7, out_features=1),
         ]
 
     def forward(self, x):
         out = x
-        #TODO
+        for layer in self.layers:
+            out = layer.forward(out)
         return out
 
     def backward(self):
-        #TODO
-        pass
+        for layer in reversed(self.layers):
+            layer.backward()
 
     def parameters(self):
         variables = []
-        #TODO
+        for layer in self.layers:
+            if type(layer) == LayerLinear:
+                variables.append(layer.W)
+                variables.append(layer.b)
         return variables
 
 class OptimizerSGD:
@@ -205,7 +227,7 @@ class OptimizerSGD:
 
     def step(self):
         for param in self.parameters:
-            param.value -= 0 #TODO
+            param.value -= np.mean(param.grad, axis=0) * self.learning_rate
 
     def zero_grad(self):
         for param in self.parameters:
@@ -217,7 +239,7 @@ optimizer = OptimizerSGD(
     model.parameters(),
     learning_rate=LEARNING_RATE
 )
-loss_fn = LossMAE()
+loss_fn = LossMSE()
 
 
 loss_plot_train = []
@@ -228,23 +250,26 @@ for epoch in range(1, 1000):
         losses = []
         for x, y in dataloader:
 
-            y_prim = 0 #TODO
-            loss = 0 #TODO
+            y_prim = model.forward(Variable(value=x))
+            loss = loss_fn.forward(Variable(value=y), y_prim)
 
             losses.append(loss)
 
             if dataloader == dataloader_train:
-                #TODO
-                pass
+                loss_fn.backward()
+                model.backward()
+
+                optimizer.step()
+                optimizer.zero_grad()
 
         if dataloader == dataloader_train:
             loss_plot_train.append(np.mean(losses))
         else:
             loss_plot_test.append(np.mean(losses))
 
-    print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
+    #print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
 
-    if epoch % 10 == 0:
+    if epoch % 200 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
