@@ -44,4 +44,34 @@ Izmantojot šo kļūdas funkciju, tiek iegūts dīvains rezultāts, es pieņemu,
 
 ![model mse local min](media/model_mse_local_min.PNG)
 
-2. ReLU
+2. ReLU implemetation
+
+Nēesmu drošs vai ir parezi, it īpaši par backwards algoritmu.
+
+~~~
+class LayerRelu():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        temp = self.x.value
+        temp[temp<0]=0
+        self.output = Variable( temp )
+        return self.output
+
+    def backward(self):
+        temp = self.output.value
+        temp[temp<0]=0
+        temp[temp>0]=1
+        self.x.grad += temp * self.output.grad
+~~~
+
+Rezultāti izmantojot Relu:
+
+Ar MSE:
+![relu mse model](media/relu_mse_model.PNG
+
+Ar MAE:
+![relu mae model](media/relu_mae_model.PNG))

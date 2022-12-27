@@ -147,19 +147,24 @@ class LayerSigmoid():
     def backward(self):
         self.x.grad += self.output.value * (1.0 - self.output.value) * self.output.grad
 
-class LayerReLU:
+class LayerRelu():
     def __init__(self):
         self.x = None
         self.output = None
 
     def forward(self, x: Variable):
-        self.x = x #TODO
-        self.output = None
+        self.x = x
+        temp = self.x.value
+        temp[temp<0]=0
+        self.output = Variable( temp )
         return self.output
 
     def backward(self):
-        self.x.grad += 1 #TODO
-
+        temp = self.output.value
+        temp[temp<0]=0
+        temp[temp>0]=1
+        self.x.grad += temp * self.output.grad
+        sc = self.x.grad
 
 class LossMSE():
     def __init__(self):
@@ -194,11 +199,11 @@ class Model:
     def __init__(self):
         self.layers = [
             LayerLinear(in_features=6, out_features=8), #izmainiju uz 6 in features nevis
-            LayerSigmoid(),
+            LayerRelu(),
             LayerLinear(in_features=8, out_features=12),
-            LayerSigmoid(),
+            LayerRelu(),
             LayerLinear(in_features=12, out_features=7),
-            LayerSigmoid(),
+            LayerRelu(),
             LayerLinear(in_features=7, out_features=1),
         ]
 
@@ -239,7 +244,7 @@ optimizer = OptimizerSGD(
     model.parameters(),
     learning_rate=LEARNING_RATE
 )
-loss_fn = LossMSE()
+loss_fn = LossMAE()
 
 
 loss_plot_train = []
