@@ -162,6 +162,19 @@ class LayerRelu():
         temp[temp>0]=1
         self.x.grad += temp * self.output.grad
 
+class LayerSwish():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        self.output = Variable(x.value / (1.0 + np.exp(-x.value)))
+        return self.output
+
+    def backward(self):
+        self.x.grad += self.output.value + np.std(x) * (1.0 - self.output.value) 
+
 class LossMSE():
     def __init__(self):
         self.y = None
@@ -195,11 +208,11 @@ class Model:
     def __init__(self):
         self.layers = [
             LayerLinear(in_features=6, out_features=8), #izmainiju uz 6 in features nevis
-            LayerRelu(),
+            LayerSwish(),
             LayerLinear(in_features=8, out_features=12),
-            LayerRelu(),
+            LayerSwish(),
             LayerLinear(in_features=12, out_features=7),
-            LayerRelu(),
+            LayerSwish(),
             LayerLinear(in_features=7, out_features=1),
         ]
 
@@ -282,13 +295,13 @@ for epoch in range(1, 1000):
 
     #print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
 
-    if epoch % 10 == 0:
+    if epoch % 150 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
         ax2.plot(loss_plot_test, 'c-', label='test')
         ax3 = ax2.twinx()
-        ax3.plot(nrmse_plot_test, 'r-', label='nrmse')
+        ax3.plot(nrmse_plot_test, 'b-', label='nrmse')
         ax1.legend()
         ax2.legend(loc='upper left')
         ax3.legend(loc='lower left')

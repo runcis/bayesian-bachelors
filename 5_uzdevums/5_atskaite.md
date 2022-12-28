@@ -87,3 +87,24 @@ def calculateNRMSE(y, y_prim):
     result = rmse/np.std(y)
     return result
 ~~~
+
+4. Swish funkcija
+
+~~~
+class LayerSwish():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        self.output = Variable(x.value / (1.0 + np.exp(-x.value)))
+        return self.output
+
+    def backward(self):
+        self.x.grad += self.output.value + np.std(x) * (1.0 - self.output.value) 
+~~~
+
+Rezultāts:
+
+![swish model](media/swish_model.PNG))
