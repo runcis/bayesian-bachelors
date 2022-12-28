@@ -89,7 +89,7 @@ def calculateNRMSE(y, y_prim):
 ~~~
 
 4. Swish funkcija
-
+Pēc rezultāti, liekas ka nav pareizi implementēts.
 ~~~
 class LayerSwish():
     def __init__(self):
