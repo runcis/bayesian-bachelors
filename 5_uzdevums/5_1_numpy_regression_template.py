@@ -127,9 +127,6 @@ class LayerLinear:
 
     def backward(self):
         self.b.grad += 1 * self.output.grad
-
-        #self.W.grad += np.expand_dims(self.x.value, axis=-1) @ np.expand_dims(self.output.grad, axis=-2)
-        #self.x.grad += np.squeeze(self.W.value @ np.expand_dims(self.output.grad, axis =-1),axis =-1)
         self.W.grad += self.x.value[:, :, np.newaxis] @ self.output.grad[:, np.newaxis, :]
         tempGrad = self.W.value @ self.output.grad[:, :, np.newaxis]
         self.x.grad += tempGrad[:, :, 0]
@@ -164,7 +161,6 @@ class LayerRelu():
         temp[temp<0]=0
         temp[temp>0]=1
         self.x.grad += temp * self.output.grad
-        sc = self.x.grad
 
 class LossMSE():
     def __init__(self):
@@ -238,6 +234,11 @@ class OptimizerSGD:
         for param in self.parameters:
             param.grad = np.zeros_like(param.grad)
 
+def calculateNRMSE(y, y_prim):
+    rmse = np.sqrt(np.mean(np.sum((y_prim - y)**2)))
+    result = rmse/np.std(y)
+    return result
+
 
 model = Model()
 optimizer = OptimizerSGD(
@@ -249,16 +250,20 @@ loss_fn = LossMAE()
 
 loss_plot_train = []
 loss_plot_test = []
+nrmse_plot_test = []
 for epoch in range(1, 1000):
 
     for dataloader in [dataloader_train, dataloader_test]:
         losses = []
+        nrmse = []
         for x, y in dataloader:
 
             y_prim = model.forward(Variable(value=x))
             loss = loss_fn.forward(Variable(value=y), y_prim)
+            nrmse_value = calculateNRMSE(y, y_prim.value)
 
             losses.append(loss)
+            nrmse.append(nrmse_value)
 
             if dataloader == dataloader_train:
                 loss_fn.backward()
@@ -271,16 +276,22 @@ for epoch in range(1, 1000):
             loss_plot_train.append(np.mean(losses))
         else:
             loss_plot_test.append(np.mean(losses))
+            nrmse_plot_test.append(np.mean(nrmse))
+
+        
 
     #print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
 
-    if epoch % 200 == 0:
+    if epoch % 10 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
         ax2.plot(loss_plot_test, 'c-', label='test')
+        ax3 = ax2.twinx()
+        ax3.plot(nrmse_plot_test, 'r-', label='nrmse')
         ax1.legend()
         ax2.legend(loc='upper left')
+        ax3.legend(loc='lower left')
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
         plt.show()

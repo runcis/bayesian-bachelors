@@ -75,3 +75,15 @@ Ar MSE:
 
 Ar MAE:
 ![relu mae model](media/relu_mae_model.PNG))
+
+
+3. NRMSE
+
+Nestrādā - nekas naparādās un grafika.
+
+~~~
+def calculateNRMSE(y, y_prim):
+    rmse = np.sqrt(np.mean(np.sum((y_prim - y)**2)))
+    result = rmse/np.std(y)
+    return result
+~~~
