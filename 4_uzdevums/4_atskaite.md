@@ -70,7 +70,7 @@ def model(x, W_1, b_1, W_2, b_2, W_3, b_3):
 
 Result:
 
-![regression-4_8_result](media/regression-4_8_result.PNG)
+![regression-4_8_result](../media/regression-4_8_result.PNG)
 
 # Task 4.1: Regressija ar svaru apmacibas modeli (4.7)
 
@@ -79,7 +79,7 @@ Modeļa implemnetācija un svaru apmacibas augstakā līmenī liekas skaidra, be
 
 
 1. Jautājums Kā var saprast kurām matricām vajag izmantot dot produktu bet kuras var vienkārši sareizināt?
-![when-to-multiply](media/when-to-multiply.PNG)
+![when-to-multiply](../media/when-to-multiply.PNG)
 šeit es biju confused jo shape ir sekojoši, d_loss - (4,1), layer_3 - (8,1,1) before transformation - (8,1), layer_1 - (4,1), layer_2 - (4,8).
 Skatoties uz shape es pieņemtu ka šīs matricas nevar sareizināt, bet pec tam kad ir izveidots 4x8 dot produkts, mums izdodas sareizināt 4x8 ar 4x1 un 4x8. kā?
 
@@ -156,4 +156,4 @@ dW_1 = np.sum(dW_1_loss(X, W_1, b_1, W_2, b_2, Y_prim, Y))
 
 6. Result
 
-![regression-with-weights](media/regression-with-weights.PNG)
+![regression-with-weights](../media/regression-with-weights.PNG)

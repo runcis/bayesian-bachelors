@@ -7,16 +7,16 @@ Novēroju, ka dažādiem modeļu tipiem tiek izveidoti citādi pielāgošanās g
 Eksperimentēju ar slāņu daudzumiem un neironu skaitiem:
 
 Mazāk neironi un slāņi:
-![model 3 layers less neurons](./media/model_3_layers_less_neurons_0.PNG)
+![model 3 layers less neurons](../media/model_3_layers_less_neurons_0.PNG)
 
 
-![model 3 layers less neurons](./media/model_3_layers_less_neurons.PNG)
+![model 3 layers less neurons](../media/model_3_layers_less_neurons.PNG)
 
 Vairāk neironu un slāņi:
-![model 4 layers more neurons](./media/model_4_layers_more_neurons_0.PNG)
+![model 4 layers more neurons](../media/model_4_layers_more_neurons_0.PNG)
 
 
-![model 4 layers more neurons](./media/model_4_layers_more_neurons.PNG)
+![model 4 layers more neurons](../media/model_4_layers_more_neurons.PNG)
 
 Kāpēc pēdējā bildē ir tik dīvaina train loss līkne?
 
@@ -42,7 +42,7 @@ class LossMSE():
 
 Izmantojot šo kļūdas funkciju, tiek iegūts dīvains rezultāts, es pieņemu, ka tas ir ātra nokļūšana pie lokālā minimuma un nespēj no tā izkāpt?
 
-![model mse local min](./media/model_mse_local_min.PNG)
+![model mse local min](../media/model_mse_local_min.PNG)
 
 2. ReLU implemetation
 
@@ -71,10 +71,10 @@ class LayerRelu():
 Rezultāti izmantojot Relu:
 
 Ar MSE:
-![relu mse model](./media/relu_mse_model.PNG
+![relu mse model](../media/relu_mse_model.PNG
 
 Ar MAE:
-![relu mae model](./media/relu_mae_model.PNG))
+![relu mae model](../media/relu_mae_model.PNG))
 
 
 3. NRMSE
@@ -107,4 +107,4 @@ class LayerSwish():
 
 Rezultāts:
 
-![swish model](./media/swish_model.PNG))
+![swish model](../media/swish_model.PNG))

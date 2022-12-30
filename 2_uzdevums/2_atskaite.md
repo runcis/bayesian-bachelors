@@ -57,4 +57,4 @@ else:
 d_loss = 2*np.mean(target_point - point_3)
 ~~~
 
-![kinematics arm](./media/kinematics-arm.PNG)
+![kinematics arm](../media/kinematics-arm.PNG)

@@ -187,8 +187,8 @@ class Planet(MovableObject):
 
 ### 6. Photos
 
-![asteroid game start](./media/asteroid-game-start.PNG)
+![asteroid game start](../media/asteroid-game-start.PNG)
 
-![asteroid game emission](./media/asteroid-game-emission.PNG)
+![asteroid game emission](../media/asteroid-game-emission.PNG)
 
-![asteroid game emission](./media/asteroid-game-over.PNG)
+![asteroid game emission](../media/asteroid-game-over.PNG)
