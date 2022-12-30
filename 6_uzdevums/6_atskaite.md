@@ -44,7 +44,7 @@ Modeļa rezultāts:
 ![6 uzd model result](../media/6-uzd-model-result.PNG))
 
 
-# Task 6_3: Pytorch classification
+# Task 6_3: Numpy classification
 
 Veidojot softmax funkciju, nesanāca to patstāvīgi izdarīt.
 
