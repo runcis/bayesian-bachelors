@@ -86,3 +86,35 @@ class LayerSoftmax():
 
         self.x.grad += np.squeeze(J @ result[:,:,np.newaxis], axis=-1)
 ~~~
+
+Loss Entropy:
+
+~~~
+class LossCrossEntropy():
+    def __init__(self):
+        self.y_prim = None
+
+    def forward(self, y, y_prim):
+        self.y = y
+        self.y_prim = y_prim
+        return np.mean(-y.value * np.log(y_prim.value + 1e-8))
+
+    def backward(self):
+         self.y_prim.grad = -self.y.value / (self.y_prim.value + 1e-8)
+~~~
+
+Accuracy evaluator:
+
+~~~
+def isAccurate(y, y_prim):
+    correct = 0
+    for i in range(BATCH_SIZE-1):
+        selectedIndex = np.where(y[i] == 1)[0][0]
+        actualMaxValue = y_prim.value[i].max()
+        if actualMaxValue == y_prim.value[i][selectedIndex]:
+            correct += 1
+    return correct/BATCH_SIZE
+~~~
+
+Result:
+![6.2 uzd model result](media/6-2-uzd-model-result.PNG))

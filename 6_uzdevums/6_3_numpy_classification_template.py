@@ -37,12 +37,12 @@ class Dataset:
         Y_tmp = Y_tmp[:,0] # dadu kopā par vienu parametru par daudz
 
         self.Y = X_classes[:, 1]
-
         self.Y_prob = np.zeros((len(self.Y), len(self.labels[1])))
-        # TODO convert to one-hot-encoded probs
+
+        indexes_range = range(len(self.Y))
+        self.Y_prob[indexes_range, self.Y] = 1.0
 
         self.X_classes = np.concatenate((X_classes[:, :1], X_classes[:, 2:]), axis=-1)
-        # TODO convert to one-hot-encoded probs
 
         X_tmp = np.array(X_tmp[:, 4:]).astype(np.float32)
         Y_tmp = np.expand_dims(Y_tmp, axis=-1).astype(np.float32)
@@ -160,10 +160,12 @@ class LayerSoftmax():
     def forward(self, x):
         self.x = x
 
-        exp_array = np.exp(x.value)
+        np_x = np.array(x.value)
+        np_x -= np.max(np_x, axis=-1, keepdims=True)
+        np_e_x = np.exp(np_x)
 
         self.output = Variable(
-            np.exp(x.value) / np.sum(exp_array, axis=-1, keepdims=True)  # var arī [:, np.newaxis]
+            np_e_x / np.sum(np_e_x, axis=-1, keepdims=True)  # var arī [:, np.newaxis]
         )
         return self.output
 
@@ -171,24 +173,15 @@ class LayerSoftmax():
         size = self.x.value.shape[-1]
         J = np.zeros((BATCH_SIZE, size, size))
         a = self.output.value
-
-        result = np.zeros((BATCH_SIZE, size))
         
         for row in range(size):
             for column in range(size):
                 if row == column:
                     J[:, row, column] = a[:,row] * (1 - a[:, column])
                 else: 
-                    J[:, row, column] = a[:,row] * a[:, column]
+                    J[:, row, column] = -a[:,row] * a[:, column]
 
-        self.x.grad += np.squeeze(J @ result[:,:,np.newaxis], axis=-1)
-
-x_dummy = np.random.random((BATCH_SIZE, 4))
-layer_softmax = LayerSoftmax()
-y_prim_dummy = layer_softmax.forward(Variable(x_dummy))
-print(y_prim_dummy.value, np.sum(y_prim_dummy.value))
-layer_softmax.backward()
-exit()
+        self.x.grad += np.squeeze(J @ np.expand_dims(self.output.grad, axis=-1), axis=-1)
 
 
 class LossCrossEntropy():
@@ -198,10 +191,10 @@ class LossCrossEntropy():
     def forward(self, y, y_prim):
         self.y = y
         self.y_prim = y_prim
-        return 0 # TODO
+        return np.mean(-y.value * np.log(y_prim.value + 1e-8))
 
     def backward(self):
-         self.y_prim.grad = 0 #TODO
+         self.y_prim.grad = -self.y.value / (self.y_prim.value + 1e-8)
 
 
 class LayerEmbedding:
@@ -223,7 +216,12 @@ class LayerEmbedding:
 class Model:
     def __init__(self):
         self.layers = [
-            #TODO
+            LayerLinear(in_features=3, out_features=8),
+            LayerSigmoid(),
+            LayerLinear(in_features=8, out_features=8),
+            LayerSigmoid(),
+            LayerLinear(in_features=8, out_features=4),
+            LayerSoftmax()
         ]
 
     def forward(self, x):
@@ -260,6 +258,16 @@ class OptimizerSGD:
             param.grad = np.zeros_like(param.grad)
 
 
+def isAccurate(y, y_prim):
+    correct = 0
+    for i in range(BATCH_SIZE-1):
+        selectedIndex = np.where(y[i] == 1)[0][0]
+        actualMaxValue = y_prim.value[i].max()
+        if actualMaxValue == y_prim.value[i][selectedIndex]:
+            correct += 1
+    return correct/BATCH_SIZE
+
+
 model = Model()
 optimizer = OptimizerSGD(
     model.parameters(),
@@ -284,7 +292,7 @@ for epoch in range(1, 1000):
             y_prim = model.forward(Variable(value=x))
             loss = loss_fn.forward(Variable(value=y), y_prim)
 
-            acc = 0 # TODO
+            acc = isAccurate(y, y_prim)
             losses.append(loss)
             accs.append(acc)
 
@@ -310,10 +318,10 @@ for epoch in range(1, 1000):
         f'acc_test: {acc_plot_test[-1]}'
     )
 
-    if epoch % 10 == 0:
+    if epoch % 100 == 0:
         _, axes = plt.subplots(nrows=2, ncols=1)
         ax1 = axes[0]
-        ax1.title("Loss")
+        ax1.set_title("Loss")
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
         ax2.plot(loss_plot_test, 'c-', label='test')
@@ -323,7 +331,7 @@ for epoch in range(1, 1000):
         ax1.set_ylabel("Loss")
 
         ax1 = axes[1]
-        ax1.title("Acc")
+        ax1.set_title("Acc")
         ax1.plot(acc_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
         ax2.plot(acc_plot_test, 'c-', label='test')
