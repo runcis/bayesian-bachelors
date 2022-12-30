@@ -35,7 +35,7 @@ class Dataset(torch.utils.data.Dataset):
         X = np.array(X)
         self.X_classes = np.array(X[:, :4])
 
-        self.X = np.array(X[:, 4:]).astype(np.float32)
+        self.X = np.array(X[:, 3:]).astype(np.float32)
         X_max = np.max(self.X, axis=0) # (7, )
         X_min = np.min(self.X, axis=0)
         self.X = (self.X - (X_max + X_min) * 0.5) / (X_max - X_min) * 0.5
@@ -44,6 +44,7 @@ class Dataset(torch.utils.data.Dataset):
         Y_max  = np.max(self.Y)
         Y_min  = np.min(self.Y)
         self.Y = (self.Y - (Y_max + Y_min) * 0.5) / (Y_max - Y_min) * 0.5
+        self.Y = self.Y[:,0] # dadu kopā par vienu parametru par daudz
 
     def __len__(self):
         return len(self.X)
@@ -73,7 +74,7 @@ dataloader_test = torch.utils.data.DataLoader(
 
 class Model(torch.nn.Module):
     
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
@@ -119,7 +120,6 @@ optimizer = torch.optim.Adam(
     lr=LEARNING_RATE
 )
 loss_fn = LossHuber(delta=0.5)
-#loss_fn = torch.nn.MSELoss()
 
 loss_plot_train = []
 loss_plot_test = []
@@ -146,7 +146,7 @@ for epoch in range(1, 1000):
 
     print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
 
-    if epoch % 10 == 0:
+    if epoch % 100 == 0:
         fig, ax1 = plt.subplots()
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
