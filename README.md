@@ -1,3 +1,204 @@
+# Task 6_2: Pytorch regression
+Uzdevuma jēga: Iepazīt Pytorch, Softmax
+
+Embedded matrix:
+
+Konceptuāli liekas ka sapratu, detaļas implementācijā nav īsti skaidras.
+
+~~~
+elf.embs = torch.nn.ModuleList()
+        for i in range(4): # brand, fuel, transmission, dealership
+            self.embs.append(
+                torch.nn.Embedding(
+                    num_embeddings=len(dataset_full.labels[i]),
+                    embedding_dim=3
+                )
+            )
+
+    def forward(self, x, x_classes):
+        x_emb_list = []
+        for i, emb in enumerate(self.embs):
+            x_emb_list.append(
+                emb.forward(x_classes[:, i])
+            )
+        x_emb = torch.cat(x_emb_list, dim=-1)
+        x_cat = torch.cat([x, x_emb], dim=-1)
+        y_prim = self.layers.forward(x_cat)
+        return y_prim
+~~~
+
+Loss Huber:
+
+~~~
+class LossHuber(torch.nn.Module):
+    def __init__(self, delta):
+        super().__init__()
+        self.delta = delta
+
+    def forward(self, y_prim, y):
+        return torch.mean(self.delta**2 * (torch.sqrt(1 + ((y - y_prim)/self.delta) ** 2) - 1))
+~~~
+
+Modeļa rezultāts:
+
+![6 uzd model result](media/6-uzd-model-result.PNG))
+
+
+# Task 6_3: Pytorch classification
+
+Veidojot softmax funkciju, nesanāca to patstāvīgi izdarīt.
+
+Forward: Kāpēc vajag iegūt np.max no ievaddatiem? Mans risinājums arī iegūst summā 1 katram no 16 ierakstiem.
+
+Backward: Nesapratu else daļu - liekas ka a[:,row] * a[:, column] īsti neizpilda formulēto rezultātu?
+*Baigi labs pieraksts, nebutu pats izdomājis, jo vel nedomāju tik labi par for loopiem iekš matricām.
+
+Softmax:
+~~~
+class LayerSoftmax():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x):
+        self.x = x
+
+        exp_array = np.exp(x.value)
+
+        self.output = Variable(
+            np.exp(x.value) / np.sum(exp_array, axis=-1, keepdims=True)
+        )
+        return self.output
+
+    def backward(self):
+        size = self.x.value.shape[-1]
+        J = np.zeros((BATCH_SIZE, size, size))
+        a = self.output.value
+
+        result = np.zeros((BATCH_SIZE, size))
+        
+        for row in range(size):
+            for column in range(size):
+                if row == column:
+                    J[:, row, column] = a[:,row] * (1 - a[:, column])
+                else: 
+                    J[:, row, column] = a[:,row] * a[:, column]
+
+        self.x.grad += np.squeeze(J @ result[:,:,np.newaxis], axis=-1)
+~~~
+
+
+# Task 5.1: Apmācības modelis mašīnu cenu pareģošanai
+
+Interesants uzdevums, ilgu laiku nočakarēju, līdz sapratu, ka man atsķirās datu kopas input features un output data (man bija 6 nevis 7 inputi un 2 nevis 1 output - t.i netikai vērtība tiek izvadīta.) Bet tas, man lika izrakņāties vairāk cauri kodam, kas likās noderīgi, lai labāk saprastu algoritmu.
+
+Novēroju, ka dažādiem modeļu tipiem tiek izveidoti citādi pielāgošanās grafiki. Bet īsti nesaprotu kā interperetēt šos grafikus.
+
+Eksperimentēju ar slāņu daudzumiem un neironu skaitiem:
+
+Mazāk neironi un slāņi:
+![model 3 layers less neurons](media/model_3_layers_less_neurons_0.PNG)
+
+
+![model 3 layers less neurons](media/model_3_layers_less_neurons.PNG)
+
+Vairāk neironu un slāņi:
+![model 4 layers more neurons](media/model_4_layers_more_neurons_0.PNG)
+
+
+![model 4 layers more neurons](media/model_4_layers_more_neurons.PNG)
+
+Kāpēc pēdējā bildē ir tik dīvaina train loss līkne?
+
+### List of implemented functions
+
+1. MSE/L2 loss function
+
+~~
+class LossMSE():
+    def __init__(self):
+        self.y = None
+        self.y_prim  = None
+
+    def forward(self, y: Variable, y_prim: Variable):
+        self.y = y
+        self.y_prim = y_prim
+        loss = np.mean(np.sum((y.value - y_prim.value)**2))
+        return loss
+
+    def backward(self):
+        self.y_prim.grad += -2*(self.y.value - self.y_prim.value)
+~~
+
+Izmantojot šo kļūdas funkciju, tiek iegūts dīvains rezultāts, es pieņemu, ka tas ir ātra nokļūšana pie lokālā minimuma un nespēj no tā izkāpt?
+
+![model mse local min](media/model_mse_local_min.PNG)
+
+2. ReLU implemetation
+
+Nēesmu drošs vai ir parezi, it īpaši par backwards algoritmu.
+
+~~~
+class LayerRelu():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        temp = self.x.value
+        temp[temp<0]=0
+        self.output = Variable( temp )
+        return self.output
+
+    def backward(self):
+        temp = self.output.value
+        temp[temp<0]=0
+        temp[temp>0]=1
+        self.x.grad += temp * self.output.grad
+~~~
+
+Rezultāti izmantojot Relu:
+
+Ar MSE:
+![relu mse model](media/relu_mse_model.PNG
+
+Ar MAE:
+![relu mae model](media/relu_mae_model.PNG))
+
+
+3. NRMSE
+
+Nestrādā - nekas naparādās un grafika.
+
+~~~
+def calculateNRMSE(y, y_prim):
+    rmse = np.sqrt(np.mean(np.sum((y_prim - y)**2)))
+    result = rmse/np.std(y)
+    return result
+~~~
+
+4. Swish funkcija
+Pēc rezultāti, liekas ka nav pareizi implementēts.
+~~~
+class LayerSwish():
+    def __init__(self):
+        self.x = None
+        self.output = None
+
+    def forward(self, x: Variable):
+        self.x = x
+        self.output = Variable(x.value / (1.0 + np.exp(-x.value)))
+        return self.output
+
+    def backward(self):
+        self.x.grad += self.output.value + np.std(x) * (1.0 - self.output.value) 
+~~~
+
+Rezultāts:
+
+![swish model](media/swish_model.PNG))
+
 # Task 5: Regresija ar svaru apmacibas modeli ar vairākiem parametriem (4.8)
 
 Nesanāk līdz galam. Liekas ka modeļa izveide sanāca un ir vienkārša(ja pareizi sapratu). Izmantojot debugger, sanāca progress ar modeļa izveidi un loss funkciju.

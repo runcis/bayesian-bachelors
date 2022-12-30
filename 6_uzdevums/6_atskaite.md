@@ -1,6 +1,5 @@
+# Task 6_2: Pytorch regression
 Uzdevuma jēga: Iepazīt Pytorch, Softmax
-
-Part1
 
 Embedded matrix:
 
@@ -45,7 +44,7 @@ Modeļa rezultāts:
 ![6 uzd model result](media/6-uzd-model-result.PNG))
 
 
-Part2
+# Task 6_3: Pytorch classification
 
 Veidojot softmax funkciju, nesanāca to patstāvīgi izdarīt.
 
