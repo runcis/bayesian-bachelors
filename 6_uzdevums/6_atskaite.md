@@ -41,7 +41,7 @@ class LossHuber(torch.nn.Module):
 
 Modeļa rezultāts:
 
-![6 uzd model result](media/6-uzd-model-result.PNG))
+![6 uzd model result](./media/6-uzd-model-result.PNG))
 
 
 # Task 6_3: Pytorch classification
@@ -117,4 +117,4 @@ def isAccurate(y, y_prim):
 ~~~
 
 Result:
-![6.2 uzd model result](media/6-2-uzd-model-result.PNG))
+![6.2 uzd model result](./media/6-2-uzd-model-result.PNG))
