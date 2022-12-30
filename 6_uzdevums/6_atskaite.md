@@ -117,4 +117,4 @@ def isAccurate(y, y_prim):
 ~~~
 
 Result:
-![6.2 uzd model result](./media/6-2-uzd-model-result.PNG))
+![6.2 uzd model result](../media/6-2-uzd-model-result.PNG))
