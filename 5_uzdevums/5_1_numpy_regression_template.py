@@ -11,7 +11,7 @@ plt.rcParams["figure.figsize"] = (12, 7) # size of window
 plt.style.use('dark_background')
 
 LEARNING_RATE = 1e-2
-BATCH_SIZE = 16
+BATCH_SIZE = 256
 TRAIN_TEST_SPLIT = 0.75
 
 class Dataset:
@@ -38,7 +38,7 @@ class Dataset:
         Y_max = np.max(self.Y)
         Y_min = np.min(self.Y)
         self.Y = (self.Y - (Y_max + Y_min) * 0.5) /(Y_max - Y_min) * 0.5
-        self.Y = self.Y[:,0] # dadu kopā par vienu parametru par daudz
+        # self.Y = self.Y[:,:1] # dadu kopā par vienu parametru par daudz
 
     def __len__(self):
         return len(self.X)
@@ -74,7 +74,6 @@ class DataLoader:
         idx_start = self.idx_batch * self.batch_size + self.idx_start
         idx_end = idx_start + self.batch_size
         x, y = self.dataset[idx_start:idx_end]
-        y = y[:, np.newaxis] # tas pats kas: y = np.expand_dims(y, axis=-1)
         self.idx_batch += 1
         return x, y
 
@@ -208,12 +207,12 @@ class Model:
     def __init__(self):
         self.layers = [
             LayerLinear(in_features=6, out_features=8), #izmainiju uz 6 in features nevis
-            LayerSwish(),
+            LayerRelu(),
             LayerLinear(in_features=8, out_features=12),
-            LayerSwish(),
+            LayerRelu(),
             LayerLinear(in_features=12, out_features=7),
-            LayerSwish(),
-            LayerLinear(in_features=7, out_features=1),
+            LayerRelu(),
+            LayerLinear(in_features=7, out_features=2),
         ]
 
     def forward(self, x):
@@ -249,7 +248,7 @@ class OptimizerSGD:
 
 def calculateNRMSE(y, y_prim):
     rmse = np.sqrt(np.mean(np.sum((y_prim - y)**2)))
-    result = rmse/np.std(y)
+    result = rmse/np.std(dataset_full.Y)
     return result
 
 
@@ -295,16 +294,20 @@ for epoch in range(1, 1000):
 
     #print(f'epoch: {epoch} loss_train: {loss_plot_train[-1]} loss_test: {loss_plot_test[-1]}')
 
-    if epoch % 150 == 0:
-        fig, ax1 = plt.subplots()
+    if epoch % 30 == 0:
+        _, axes = plt.subplots(nrows=2, ncols=1)
+        ax1 = axes[0]
+        
         ax1.plot(loss_plot_train, 'r-', label='train')
         ax2 = ax1.twinx()
         ax2.plot(loss_plot_test, 'c-', label='test')
-        ax3 = ax2.twinx()
-        ax3.plot(nrmse_plot_test, 'b-', label='nrmse')
         ax1.legend()
         ax2.legend(loc='upper left')
-        ax3.legend(loc='lower left')
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Loss")
+
+        ax1 = axes[1]
+        ax1.plot(nrmse_plot_test, 'b-', label='nrmse')
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("NRMS Error")
         plt.show()

@@ -318,7 +318,7 @@ for epoch in range(1, 1000):
         f'acc_test: {acc_plot_test[-1]}'
     )
 
-    if epoch % 100 == 0:
+    if epoch % 30 == 0:
         _, axes = plt.subplots(nrows=2, ncols=1)
         ax1 = axes[0]
         ax1.set_title("Loss")

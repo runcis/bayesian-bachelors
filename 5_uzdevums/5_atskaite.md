@@ -79,14 +79,16 @@ Ar MAE:
 
 3. NRMSE
 
-Nestrādā - nekas naparādās un grafika.
+Pēc komentāra par batch size paplašināšanu un pievienojot visa datuseta standarta novirzi rezultāti redzami apakšā.
 
 ~~~
 def calculateNRMSE(y, y_prim):
     rmse = np.sqrt(np.mean(np.sum((y_prim - y)**2)))
-    result = rmse/np.std(y)
+    result = rmse/np.std(dataset_full.Y)
     return result
 ~~~
+
+![5 1 relu, fixed nmrse](../media/5-1-relu.PNG))
 
 4. Swish funkcija
 Pēc rezultāti, liekas ka nav pareizi implementēts.
@@ -108,3 +110,4 @@ class LayerSwish():
 Rezultāts:
 
 ![swish model](../media/swish_model.PNG))
+![5 1 nmrse fixed](../media/5-1-nmrse-fixed.PNG))
