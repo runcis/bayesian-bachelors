@@ -48,7 +48,6 @@ Modeļa rezultāts:
 
 Veidojot softmax funkciju, nesanāca to patstāvīgi izdarīt.
 
-Forward: Kāpēc vajag iegūt np.max no ievaddatiem? Mans risinājums arī iegūst summā 1 katram no 16 ierakstiem.
 
 Backward: Nesapratu else daļu - liekas ka a[:,row] * a[:, column] īsti neizpilda formulēto rezultātu?
 *Baigi labs pieraksts, nebutu pats izdomājis, jo vel nedomāju tik labi par for loopiem iekš matricām.
@@ -63,10 +62,12 @@ class LayerSoftmax():
     def forward(self, x):
         self.x = x
 
-        exp_array = np.exp(x.value)
+        np_x = np.array(x.value)
+        np_x -= np.max(np_x, axis=-1, keepdims=True)
+        np_e_x = np.exp(np_x)
 
         self.output = Variable(
-            np.exp(x.value) / np.sum(exp_array, axis=-1, keepdims=True)
+            np_e_x / np.sum(np_e_x, axis=-1, keepdims=True)  # var arī [:, np.newaxis]
         )
         return self.output
 
@@ -74,17 +75,15 @@ class LayerSoftmax():
         size = self.x.value.shape[-1]
         J = np.zeros((BATCH_SIZE, size, size))
         a = self.output.value
-
-        result = np.zeros((BATCH_SIZE, size))
         
         for row in range(size):
             for column in range(size):
                 if row == column:
                     J[:, row, column] = a[:,row] * (1 - a[:, column])
                 else: 
-                    J[:, row, column] = a[:,row] * a[:, column]
+                    J[:, row, column] = -a[:,row] * a[:, column]
 
-        self.x.grad += np.squeeze(J @ result[:,:,np.newaxis], axis=-1)
+        self.x.grad += np.squeeze(J @ np.expand_dims(self.output.grad, axis=-1), axis=-1)
 ~~~
 
 Loss Entropy:

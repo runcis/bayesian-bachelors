@@ -11,7 +11,7 @@ plt.rcParams["figure.figsize"] = (12, 14) # size of window
 plt.style.use('dark_background')
 
 LEARNING_RATE = 1e-1
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 TRAIN_TEST_SPLIT = 0.8
 
 class Dataset:
@@ -318,7 +318,7 @@ for epoch in range(1, 1000):
         f'acc_test: {acc_plot_test[-1]}'
     )
 
-    if epoch % 30 == 0:
+    if epoch % 100 == 0:
         _, axes = plt.subplots(nrows=2, ncols=1)
         ax1 = axes[0]
         ax1.set_title("Loss")
