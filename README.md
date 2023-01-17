@@ -2,8 +2,7 @@
 
 Uzdevums izdevās labi, likās interesanti strādāt ar visuālu recognition bet liekas ka implementāciju kerneliem un paddingam līdz galam neaptvēru, jo sanāca ļoti norakstīt kodu no lekcijas.
 
-
-Jautājumu īsti nav.
+Jautājumi ir tikai par naming - kad skatos citus skaidrojošus video, tur tiek runāts par filters un filter_size - kā tie saistās ar mums izmantotajiem in_channels, out_channels, kernel_size?
 
 ### List of implemented functions:
 
