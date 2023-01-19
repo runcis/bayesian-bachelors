@@ -1,8 +1,8 @@
 # Task 7_1: Konvolūcijas tīkla implementācija & Maxpool funkcija
 
-Uzdevums izdevās labi, likās interesanti strādāt ar visuālu recognition bet liekas ka implementāciju kerneliem un paddingam līdz galam neaptvēru, jo sanāca ļoti norakstīt kodu no lekcijas. 
+Uzdevums izdevās labi, likās interesanti strādāt ar vizuālu recognition bet liekas ka implementāciju kerneliem un paddingam līdz galam neaptvēru, jo sanāca ļoti norakstīt kodu no lekcijas. 
 
-Jautājumi ir tikai par naming - kad skatos citus skaidrojošus video, tur tiek runāts par filters un filter_size - kā tie saistās ar mums izmantotajiem in_channels, out_channels, kernel_size?
+Konceptuāli īsti nesapratu kā tas viss strādā no lekcijas tapēc paskatījos extra video no andrew ng un MIT lai labak ieietu smadzenes.
 
 ### List of implemented functions:
 

@@ -26,9 +26,9 @@ DEVICE = 'cuda'
 MAX_LEN = 0
 
 if not torch.cuda.is_available():
-    MAX_LEN = 26 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
+    MAX_LEN = 0 # limit max number of samples otherwise too slow training (on GPU use all samples / for final training)
     DEVICE = 'cpu'
-    BATCH_SIZE = 6
+    BATCH_SIZE = 64
 
 
 
@@ -37,9 +37,9 @@ class DatasetApples(torch.utils.data.Dataset):
         super().__init__()
         path_dataset = '../data/apples_dataset.pkl'
         if not os.path.exists(path_dataset):
-            os.makedirs('../data', exist_ok=True)
+            os.makedirs('../../../Downloads/data', exist_ok=True)
             download_url_to_file(
-                'http://share.yellowrobot.xyz/1630528570-intro-course-2021-q4/apples_dataset.pkl',
+                'http://share.yellowrobot.xyz/1630528570-intro-course-2021-q4/apples_dataset_9_2.pkl',
                 path_dataset,
                 progress=True
             )
@@ -60,8 +60,16 @@ class DatasetApples(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x = self.X[idx] / 255
         y_label = self.Y[idx]
+
+        self.applyNoise(x)
         y_target = x
+
         return x, y_target, y_label
+
+    def applyNoise(self, x):
+        if np.random.random() < 0.5:
+            noise = torch.randn(x.size())
+            x[noise < 0.5] = 0
 
 
 dataset_full = DatasetApples()
@@ -86,19 +94,56 @@ data_loader_test = torch.utils.data.DataLoader(
     drop_last=(len(dataset_test) % BATCH_SIZE == 1)
 )
 
-
 class AutoEncoder(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        # Input (B, 3, 100, 100)
-        self.encoder = torch.nn.Sequential(
-            #TODO
 
+        self.encoder = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=3, out_channels=4, kernel_size=7, stride=3, padding=0),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.Conv2d(in_channels=4, out_channels=8, kernel_size=8, stride=4, padding=2),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=16),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=32),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=32),
+            torch.nn.Tanh()
         )
 
         self.decoder = torch.nn.Sequential(
-            torch.nn.Upsample(size=100),
-            torch.nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, stride=1, padding=1)
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=24, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=24),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.ConvTranspose2d(in_channels=24, out_channels=12, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=12),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.ConvTranspose2d(in_channels=12, out_channels=8, kernel_size=4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(num_features=8),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=4, kernel_size=8, stride=4, padding=2),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=7, stride=3, padding=0),
+            torch.nn.BatchNorm2d(num_features=4),
+            torch.nn.LeakyReLU(),
+
+            torch.nn.ConvTranspose2d(in_channels=4, out_channels=3, kernel_size=3, stride=1, padding=1),
+            torch.nn.BatchNorm2d(num_features=3),
+            torch.nn.Sigmoid()
         )
 
 
@@ -142,7 +187,7 @@ for epoch in range(1, 100):
             y_label = y_label.squeeze().to(DEVICE)
 
             y_prim, z = model.forward(x)
-            loss = 0 # TODO
+            loss = torch.mean((x - y_prim)**2)
             metrics_epoch[f'{stage}_loss'].append(loss.cpu().item())
 
             if data_loader == data_loader_train:
