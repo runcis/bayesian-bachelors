@@ -1,10 +1,12 @@
-# Task 9
+# Task 9: AE & DAE
 
 
 Ļoti interesants. Saskāros ar vairākām problēmām bet visas ātrāk vai vēlāk atrisisināju(colab negāja, decoding slānis nedeva correct shape, batch size kad lietoju cpu nemaceju izmainit u.c. )
 
 Jautājumi:
-1. 
+1. Kam īsti ir vajadzīgi ģeneratīvie modeļi? Vai tie domāti modeļa veidotājam kā reference modeļa pielāgotībai vai tie kkā arī uzlabo pašu modeli?
+2. Nesapratu kā adding noise tieši mums palīdz? ģenerētie rezultāti neizskatās labāk. Es lasīju ka tie palīdz, lai samazinātu overfitting un underfitting, ko tiesi tas nozīmē?
+3. 
 
 1 Novērojums: Liekas ka tīrīšanas slānis īpaši neuzlabo rezultātus šajā modelī.
 
@@ -112,4 +114,4 @@ Norakstīts no lekcijas. Nesparotu kapēc tas strādā - vai tad mēs neuzģenē
             x[noise < 0.5] = 0
 ~~~
 
-![noise-added-results](../media/9_1_added_noise.PNG)
+![noise added results](../media/9_1_added_noise.PNG)
