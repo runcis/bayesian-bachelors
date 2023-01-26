@@ -156,8 +156,8 @@ class AutoEncoder(torch.nn.Module):
 
 model = AutoEncoder()
 
-dummy = torch.randn((BATCH_SIZE, 3, 100, 100))
-y_target = model.forward(dummy)
+#dummy = torch.randn((BATCH_SIZE, 3, 100, 100))
+#y_target = model.forward(dummy)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 

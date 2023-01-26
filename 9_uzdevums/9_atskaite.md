@@ -6,6 +6,8 @@
 Jautājumi:
 1. Kam īsti ir vajadzīgi ģeneratīvo modeļu izveidotās bildes?
 2. Izveidojot algoritmu ar upsample, ģenerētās bildes izskatās sliktāk. Kāpēc tā?
+3. Kāpēc mēs samazinam bildes izmeru lidz 1x1?
+4. Kā pievienot bildi datusetam? kādā formātā?
 
 Par noise:
 1. Nesapratu kā adding noise tieši mums palīdz? ģenerētie rezultāti neizskatās labāk. Es lasīju ka tie palīdz, lai samazinātu overfitting un underfitting, ko tieši tas nozīmē?
