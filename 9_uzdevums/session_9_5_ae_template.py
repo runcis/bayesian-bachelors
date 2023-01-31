@@ -2,20 +2,16 @@ import os
 import pickle
 
 import torch
-import torch.nn.functional as F
 import numpy as np
-import matplotlib
-import torchvision
 from torch.hub import download_url_to_file
-from tqdm import tqdm # pip install tqdm
-import random
+from tqdm import tqdm
+from PIL import Image
 
 import matplotlib.pyplot as plt
 plt.rcParams["figure.figsize"] = (15, 10)
 plt.style.use('dark_background')
 
 import torch.utils.data
-import scipy.misc
 import scipy.ndimage
 import sklearn.decomposition
 
@@ -52,6 +48,8 @@ class DatasetApples(torch.utils.data.Dataset):
         Y = torch.LongTensor(Y)
         self.Y = Y.unsqueeze(dim=-1)
 
+        self.labels.append('Cats')
+
     def __len__(self):
         if MAX_LEN:
             return MAX_LEN
@@ -61,24 +59,70 @@ class DatasetApples(torch.utils.data.Dataset):
         x = self.X[idx] / 255
         y_label = self.Y[idx]
 
-        self.applyNoise(x)
+        #self.applyNoise(x)
         y_target = x
 
         return x, y_target, y_label
 
     def applyNoise(self, x):
-        if np.random.random() < 0.5:
-            noise = torch.randn(x.size())
-            x[noise < 0.5] = 0
+        noise = torch.zeros(x.size())
+        noise = torch.poisson(noise)
+        x[noise < 0.5] = 0
+
+class DatasetAnomalies(torch.utils.data.Dataset):
+    def __init__(self):
+        super().__init__()
+
+        img1 = np.array([])
+        img2 = np.array([])
+        img3 = np.array([])
+        img4 = np.array([])
+        img5 = np.array([])
+        with Image.open("../data/9_5_anomalies/cat_1.jpg") as im:
+            img1= np.array(im)
+        with Image.open("../data/9_5_anomalies/cat_2.jpg") as im:
+            img2= np.array(im)
+        with Image.open("../data/9_5_anomalies/cat_3.jpg") as im:
+            img3= np.array(im)
+        with Image.open("../data/9_5_anomalies/cat_4.jpg") as im:
+            img4= np.array(im)
+        with Image.open("../data/9_5_anomalies/cat_5.jpg") as im:
+            img5= np.array(im)
+
+        arrayOfImages = np.concatenate((img1[np.newaxis,:], img2[np.newaxis,:], img3[np.newaxis,:], img4[np.newaxis,:], img5[np.newaxis,:]),0)
+
+        X = torch.from_numpy(np.array(arrayOfImages))
+        self.X = X.permute(0, 3, 1, 2)
+        Y = torch.LongTensor([5, 5, 5, 5, 5])
+        self.Y = Y.unsqueeze(dim=-1)
+        self.labels = ['orange']
+        self.input_size = 100
+
+    def __len__(self):
+        if MAX_LEN:
+            return MAX_LEN
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        x = self.X[idx] / 255
+        y_label = self.Y[idx]
+
+        y_target = x
+
+        return x, y_target, y_label
 
 
-dataset_full = DatasetApples()
-train_test_split = int(len(dataset_full) * TRAIN_TEST_SPLIT)
+dataset_apples = DatasetApples()
+dataset_anomalies = DatasetAnomalies()
+
+train_test_split = int(len(dataset_apples) * TRAIN_TEST_SPLIT)
 dataset_train, dataset_test = torch.utils.data.random_split(
-    dataset_full,
-    [train_test_split, len(dataset_full) - train_test_split],
+    dataset_apples,
+    [train_test_split, len(dataset_apples) - train_test_split],
     generator=torch.Generator().manual_seed(0)
 )
+
+dataset_test = torch.utils.data.ConcatDataset([dataset_test, dataset_anomalies])
 
 data_loader_train = torch.utils.data.DataLoader(
     dataset=dataset_train,
@@ -102,65 +146,74 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.Conv2d(in_channels=3, out_channels=4, kernel_size=3, stride=1, padding=1),
             torch.nn.GroupNorm(num_channels=4, num_groups=2),
             torch.nn.Mish(),
-            torch.nn.Upsample(size=50),
+
+            torch.nn.Upsample(size=60),
 
             torch.nn.Conv2d(in_channels=4, out_channels=8, kernel_size=3, stride=1, padding=1),
             torch.nn.GroupNorm(num_channels=8, num_groups=2),
             torch.nn.Mish(),
 
-            torch.nn.Upsample(size=10),  # 100>10
+            torch.nn.Upsample(size=30),
 
-            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=1, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=16, num_groups=4),
-            torch.nn.Mish(),
-
-            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=32, num_groups=8),
-            torch.nn.Mish(),
-
-            torch.nn.Upsample(size=1),  # 10>1
-
-            torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=32, num_groups=8),
-
-            torch.nn.Tanh()
-        )
-
-        self.decoder = torch.nn.Sequential(
-            torch.nn.ConvTranspose2d(in_channels=32, out_channels=24, kernel_size=3, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=24, num_groups=4),
-            torch.nn.Mish(),
-
-            torch.nn.Upsample(size=5),
-
-            torch.nn.ConvTranspose2d(in_channels=24, out_channels=12, kernel_size=3, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=12, num_groups=4),
+            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=16, num_groups=2),
             torch.nn.Mish(),
 
             torch.nn.Upsample(size=10),
 
-            torch.nn.ConvTranspose2d(in_channels=12, out_channels=8, kernel_size=3, stride=1, padding=1),
+            torch.nn.Conv2d(in_channels=16, out_channels=24, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=24, num_groups=2),
+            torch.nn.Mish(),
+
+            torch.nn.Upsample(size=3),
+
+            torch.nn.Conv2d(in_channels=24, out_channels=32, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=32, num_groups=2),
+            torch.nn.Mish(),
+
+            torch.nn.Upsample(size=1),
+
+            torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=32, num_groups=2),
+            torch.nn.Tanh()
+        )
+
+        self.decoder = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=32, out_channels=24, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=24, num_groups=2),
+            torch.nn.Mish(),
+
+            torch.nn.Upsample(size=3),
+
+            torch.nn.Conv2d(in_channels=24, out_channels=18, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=18, num_groups=2),
+            torch.nn.Mish(),
+
+            torch.nn.Conv2d(in_channels=18, out_channels=12, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=12, num_groups=2),
+            torch.nn.Mish(),
+
+            torch.nn.Upsample(size=10),
+
+            torch.nn.Conv2d(in_channels=12, out_channels=8, kernel_size=3, stride=1, padding=1),
             torch.nn.GroupNorm(num_channels=8, num_groups=2),
             torch.nn.Mish(),
 
-            torch.nn.Upsample(size=40),
+            torch.nn.Upsample(size=60),
 
-            torch.nn.ConvTranspose2d(in_channels=8, out_channels=4, kernel_size=3, stride=1, padding=1),
+            torch.nn.Conv2d(in_channels=8, out_channels=4, kernel_size=3, stride=1, padding=1),
             torch.nn.GroupNorm(num_channels=4, num_groups=2),
             torch.nn.Mish(),
 
-            torch.nn.Upsample(size=80),
+            torch.nn.Upsample(size=100),
 
-            torch.nn.ConvTranspose2d(in_channels=4, out_channels=4, kernel_size=3, stride=1, padding=1),
+            torch.nn.Conv2d(in_channels=4, out_channels=4, kernel_size=3, stride=1, padding=1),
             torch.nn.GroupNorm(num_channels=4, num_groups=2),
             torch.nn.Mish(),
 
-            torch.nn.Upsample(size=100),  # 10x10>100
-
-            torch.nn.ConvTranspose2d(in_channels=4, out_channels=3, kernel_size=3, stride=1, padding=1),
-            torch.nn.GroupNorm(num_channels=3, num_groups=3),
+            torch.nn.Conv2d(in_channels=4, out_channels=3, kernel_size=3, stride=1, padding=1),
+            torch.nn.GroupNorm(num_channels=3, num_groups=1),
             torch.nn.Tanh()
-
         )
 
 
@@ -243,7 +296,7 @@ for epoch in range(1, 100):
 
     for i, j in enumerate([4, 5, 6, 16, 17, 18]):
         plt.subplot(8, 6, j) # row col idx
-        plt.title(f"class: {dataset_full.labels[np_y_label[i]]}")
+        plt.title(f"class: {dataset_apples.labels[np_y_label[i]]}")
         plt.imshow(np.transpose(np_x[i], (1, 2, 0)))
 
         plt.subplot(8, 6, j+6) # row col idx
@@ -258,7 +311,7 @@ for epoch in range(1, 100):
     np_z = pca.fit_transform(np_z)
     np_z_label = np.array(metrics_epoch[f'train_labels'])
     scatter = plt.scatter(np_z[:, -1], np_z[:, -2], c=np_z_label)
-    plt.legend(handles=scatter.legend_elements()[0], labels=dataset_full.labels)
+    plt.legend(handles=scatter.legend_elements()[0], labels=dataset_apples.labels)
 
     plt.subplot(224) # row col idx
 
@@ -267,7 +320,7 @@ for epoch in range(1, 100):
     np_z = pca.fit_transform(np_z)
     np_z_label = np.array(metrics_epoch[f'test_labels'])
     scatter = plt.scatter(np_z[:, -1], np_z[:, -2], c=np_z_label)
-    plt.legend(handles=scatter.legend_elements()[0], labels=dataset_full.labels)
+    plt.legend(handles=scatter.legend_elements()[0], labels=dataset_apples.labels)
 
     plt.tight_layout(pad=0.5)
     plt.show()
