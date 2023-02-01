@@ -26,6 +26,7 @@ if not torch.cuda.is_available():
     DEVICE = 'cpu'
     BATCH_SIZE = 64
 
+stage = ''
 
 
 class DatasetApples(torch.utils.data.Dataset):
@@ -59,15 +60,38 @@ class DatasetApples(torch.utils.data.Dataset):
         x = self.X[idx] / 255
         y_label = self.Y[idx]
 
-        #self.applyNoise(x)
+        if stage == 'train':
+            self.applyLaplaceNoise(x)
         y_target = x
 
         return x, y_target, y_label
 
     def applyNoise(self, x):
-        noise = torch.zeros(x.size())
-        noise = torch.poisson(noise)
+        noise = torch.randn(x.size())
         x[noise < 0.5] = 0
+
+    def applyPoissonNoise(self, x):
+        noise = torch.poisson(torch.rand(x.size()))
+        x[noise == 0] = 0
+
+    def applyGammaNoise(self, x):
+        alpha = torch.rand(x.size())
+        alpha[alpha <= 0.0] = 0.001 # lai izvairitos no constraints.positive
+        beta = torch.ones(x.size())
+        gamma = torch.distributions.gamma.Gamma(alpha, beta)
+        x[gamma.mean < 0.5] = 0
+
+    def applyBetaNoise(self, x):
+        alpha = 2
+        beta = 2
+        beta = torch.distributions.beta.Beta(alpha, beta)
+        x[beta.sample(x.size()) < 0.3] = 0
+
+    def applyLaplaceNoise(self, x):
+        location = 0
+        scale = 2
+        laplace = torch.distributions.laplace.Laplace(location, scale)
+        x[laplace.sample(x.size()) < 0] = 0
 
 class DatasetAnomalies(torch.utils.data.Dataset):
     def __init__(self):
@@ -226,8 +250,8 @@ class AutoEncoder(torch.nn.Module):
 
 model = AutoEncoder()
 
-dummy = torch.randn((BATCH_SIZE, 3, 100, 100))
-y_target = model.forward(dummy)
+#dummy = torch.randn((BATCH_SIZE, 3, 100, 100))
+#y_target = model.forward(dummy)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 

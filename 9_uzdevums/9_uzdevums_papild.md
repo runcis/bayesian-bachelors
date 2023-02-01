@@ -236,7 +236,7 @@ dataset_train, dataset_test = torch.utils.data.random_split(
 dataset_test = torch.utils.data.ConcatDataset([dataset_test, dataset_anomalies])
 ~~~
 
-## Rezultātu analīze:
+## Rezultātu analīze (bez noise):
 
 Sākumā modelis atšķīra kaķu bildes no āboliem:
 ![anomalies-1.PNG](..%2Fmedia%2Fanomalies-1.PNG)
@@ -244,8 +244,67 @@ Sākumā modelis atšķīra kaķu bildes no āboliem:
 Taču turpinot trenēties, modelis šķiet identificēja mazāk atšķību no citām bildēm:
 ![anomalies-2.PNG](..%2Fmedia%2Fanomalies-2.PNG)
 
-Nesapratu kāpēc tā...
 
+## Noise papildinājumi:
+
+Lai implementētu noise tikai treniņu datiem, pārveidoju stage par class variable un pievienoju pārbaudi noise funkcijai:
+~~~
+   if stage == 'train':
+       self.applyNoise(x)
+~~~
+
+1. Gaussian (classroom) noise:
+~~~
+def applyNoise(self, x):
+    noise = torch.randn(x.size())
+    x[noise < 0.5] = 0
+~~~
+![cats_with_noise_1.PNG](..%2Fmedia%2Fcats_with_noise_1.PNG)
+
+2. Poisson noise:
+~~~
+def applyPoissonNoise(self, x):
+    noise = torch.poisson(torch.rand(x.size()))
+    x[noise == 0] = 0
+~~~
+![poissont-noise.PNG](..%2Fmedia%2Fpoissont-noise.PNG)
+
+3. Gamma noise:
+~~~
+def applyGammaNoise(self, x):
+    alpha = torch.rand(x.size())
+    alpha[alpha <= 0.0] = 0.001 # lai izvairitos no constraints.positive
+    beta = torch.ones(x.size())
+    gamma = torch.distributions.gamma.Gamma(alpha, beta)
+    x[gamma.mean < 0.5] = 0
+~~~
+![gamma-1.PNG](..%2Fmedia%2Fgamma-1.PNG)
+Viens interesants ģenerets kaķis:
+![gamma2.PNG](..%2Fmedia%2Fgamma2.PNG)
+
+4. Beta noise:
+~~~
+def applyBetaNoise(self, x):
+    alpha = 2
+    beta = 2
+    beta = torch.distributions.beta.Beta(alpha, beta)
+    x[beta.sample(x.size()) < 0.5] = 0
+~~~
+![beta05.PNG](..%2Fmedia%2Fbeta05.PNG)
+
+Iedomājos ka jāsamazina troksnis, nevis pusei no pikseliem, bet apmeram 30% (x[beta.sample(x.size()) < 0.5] = 0):
+![beta03.PNG](..%2Fmedia%2Fbeta03.PNG)
+šķiet ka atdalīšanās kaķu bildēm ir lielāka
+
+5. Laplace noise:
+~~~
+def applyLaplaceNoise(self, x):
+    location = 0
+    scale = 2
+    laplace = torch.distributions.laplace.Laplace(location, scale)
+    x[laplace.sample(x.size()) < 0] = 0
+~~~
+![laplace_noise.PNG](..%2Fmedia%2Flaplace_noise.PNG)
 
 
 Mēģināju izmantot InstanceNorm2d, bet sapratu ka nevar izmantot instanceNorm2d ar 1x1 izmēra matricām:
