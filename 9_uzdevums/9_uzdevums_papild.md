@@ -2,6 +2,8 @@
 
 Veidojot pārbaudi anomāliju detektēšanai, sanāca interesanti rezultāti.
 
+1. Vai nevajadzētu kkā izmainīt kļūdas funkciju?
+
 Sākumā uztaisiju daudz lielāku encoding - decoding algoritmu ar daudziem slāņiem:
 
 ~~~
