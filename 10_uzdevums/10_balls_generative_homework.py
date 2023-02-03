@@ -178,21 +178,10 @@ INDEXES_TO_ENCODE_CORNER = [
     224, 225, 237, 243, 249, 252, 253, 259, 284, 285, 293, 330, 341, 344,
 ]
 
-
+# ENCODING big red:
 x_to_encode = []
-for idx in INDEXES_TO_ENCODE_CORNER:
+for idx in INDEXES_TO_ENCODE_BIG_RED:
     x_to_encode.append(dataset[idx])
-
-plt_rows = int(np.ceil(np.sqrt(len(x_to_encode))))
-for i in range(len(x_to_encode)):
-    plt.subplot(plt_rows, plt_rows, i + 1)
-    x = x_to_encode[i]
-    plt.imshow(x)
-    plt.title(f"idx: {INDEXES_TO_ENCODE_CORNER[i]}")
-    plt.tight_layout(pad=0.5)
-plt.show()
-
-
 
 x_tensor = torch.stack(x_to_encode)
 zs = model.encode_z(x_tensor.permute(0, 3, 2, 1))
@@ -202,18 +191,11 @@ x2_to_encode = []
 for idx in INDEXES_TO_ENCODE_SMALL_GREEN:
     x2_to_encode.append(dataset[idx])
 
-plt_rows = int(np.ceil(np.sqrt(len(x2_to_encode))))
-for i in range(len(x2_to_encode)):
-    plt.subplot(plt_rows, plt_rows, i + 1)
-    x = x2_to_encode[i]
-    plt.imshow(x)
-    plt.title(f"idx: {INDEXES_TO_ENCODE_SMALL_GREEN[i]}")
-    plt.tight_layout(pad=0.5)
-plt.show()
-
 x2_tensor = torch.stack(x2_to_encode)
 zs2 = model.encode_z(x2_tensor.permute(0, 3, 2, 1))
-z_comb = torch.add(zs, zs2)
+
+z_comb = (zs + zs2) * 0.5
+
 z_mu = torch.mean(z_comb, dim=0)
 z_sigma = torch.std(z_comb, dim=0)
 

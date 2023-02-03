@@ -181,37 +181,20 @@ x_to_encode = []
 for idx in INDEXES_TO_ENCODE_THREE:
     x_to_encode.append(dataset[idx][0])
 
-plt_rows = int(np.ceil(np.sqrt(len(x_to_encode))))
-for i in range(len(x_to_encode)):
-    plt.subplot(plt_rows, plt_rows, i + 1)
-    x = x_to_encode[i]
-    plt.imshow(x[0].T, cmap=plt.get_cmap('Greys'))
-    plt.title(f"idx: {INDEXES_TO_ENCODE_THREE[i]}")
-    plt.tight_layout(pad=0.5)
-plt.show()
-
 x_tensor = torch.stack(x_to_encode)
 zs = model.encode_z(x_tensor)
-
 
 # ENCODING 0:
 x2_to_encode = []
 for idx in INDEXES_TO_ENCODE_ZERO:
     x2_to_encode.append(dataset[idx][0])
 
-plt_rows = int(np.ceil(np.sqrt(len(x2_to_encode))))
-for i in range(len(x2_to_encode)):
-    plt.subplot(plt_rows, plt_rows, i + 1)
-    x = x2_to_encode[i]
-    plt.imshow(x[0].T, cmap=plt.get_cmap('Greys'))
-    plt.title(f"idx: {INDEXES_TO_ENCODE_ZERO[i]}")
-    plt.tight_layout(pad=0.5)
-plt.show()
-
 x2_tensor = torch.stack(x2_to_encode)
 zs2 = model.encode_z(x2_tensor)
 
-z_comb = torch.add(torch.mean(zs, dim=0), torch.mean(zs2, dim=0))
+temp_tensor = zs *0.5
+z_comb = (zs *0.5) + (zs2*0.5)
+    #torch.add(torch.mean(zs, dim=0), torch.mean(zs2, dim=0))
 
 z_mu = torch.mean(z_comb, dim=0)
 z_sigma = torch.std(z_comb, dim=0)
