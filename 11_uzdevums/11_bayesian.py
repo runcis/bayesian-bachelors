@@ -1,88 +1,93 @@
-import torch, torchvision
-from torch import nn
-from torch import optim
-from torchvision.transforms import ToTensor
-import torch.nn.functional as F
+import numpy as np
+import torch
+import sklearn.model_selection
+from sklearn import datasets
+from matplotlib import pyplot
+
+import scipy.stats
 import matplotlib.pyplot as plt
-import copy
 
-DEVICE = 'cpu'
-if torch.cuda.is_available():
-    DEVICE = 'cuda'
-    MAX_LEN = 0
 
-BATCH_SIZE = 64
-LEARNING_RATE=1e-3
+BATCH_SIZE = 18
+LEARNING_RATE = 0.001
 
-T = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor()
-])
+housing = datasets.fetch_california_housing()
+print(housing.feature_names)
 
-train_data = torchvision.datasets.MNIST(root='../data', train=True, download=True, transform=T)
-test_data = torchvision.datasets.MNIST(root='../data', train=False, download=True, transform=T)
+x = housing.data
+y = housing.target
 
-train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=BATCH_SIZE)
-test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=BATCH_SIZE)
 
-def create_lenet():
-    model = nn.Sequential(
+x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y, test_size=0.2)
+x_train = torch.tensor(x_train)
+x_test = torch.tensor(x_test)
+y_train = torch.tensor(y_train)
+y_test = torch.tensor(y_test)
+mu = 10
+sigma = 2.
 
-        nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, padding=2),
-        nn.ReLU(),
-        nn.AvgPool2d(2, stride=2),
+class Model(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
 
-        nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, padding=0),
-        nn.ReLU(),
-        nn.AvgPool2d(2, stride=2),
+        self.layers = torch.nn.Sequential(
+            torch.nn.Linear(in_features=8, out_features=12),
+            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=12, out_features=16),
+            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=16, out_features=12),
+            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=12, out_features=8),
+            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=8, out_features=4),
+            torch.nn.Sigmoid(),
+            torch.nn.Linear(in_features=4, out_features=1),
+            torch.nn.Softmax()
+        )
 
-        nn.Flatten(),
-        nn.Linear(400, 120),
-        nn.ReLU(),
-        nn.Linear(120, 84),
-        nn.ReLU(),
-        nn.Linear(84, 10)
-    )
-    return model
+        self.nn_layers = torch.nn.ModuleList()
 
-def testModel(model, data):
-    total = 0
-    correct = 0
-    for i, (images, labels) in enumerate(data):
-        images = images.cuda()
-        x = model(images)
+    def forward(self, x):
+        # out = x
+        # for layer in self.layers:
+        #     out = layer.forward(out)
+        # return out
+        y_prim = self.layers.forward(x)
+        return y_prim
 
-        value, prediction = torch.max(x, 1)
-        prediction = prediction.data.cpu()
-        total += x.size(0)
+    def backward(self):
+        for layer in reversed(self.layers):
+            layer.backward()
 
-        correct += torch.sum(prediction == labels)
 
-    return correct *100./total
 
-def trainModel(epochs):
-    accuracies = []
-    cnn = create_lenet().to(DEVICE)
-    cec = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(cnn.parameters(), lr=LEARNING_RATE)
-    #max_accuracy
+model = Model()
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=LEARNING_RATE
+)
+criteria = torch.nn.MSELoss()
 
-    for epoch in range(epochs):
-        for i, (images, labels) in enumerate(train_dataloader):
-            images = images.to(DEVICE)
-            labels = labels.to(DEVICE),
-            optimizer.zero_grad()
-            pred = cnn(images)
-            loss = cec(pred, labels)
-            loss.backward()
-            optimizer.step()
-        accuracy = float(testModel(cnn, test_dataloader))
-        accuracies.append(accuracy)
-        if accuracy > max_accuracy:
-            best_model = copy.deepcopy(cnn)
-            max_accuracy = accuracy
-            print("Saving Best Model with Accuracy: ", accuracy)
-        print('Epoch:', epoch + 1, "Accuracy :", accuracy, '%')
-    plt.plot(accuracies)
-    return best_model
+loss_plot_train = []
+loss_plot_test = []
+for epoch in range(1, 1000):
 
-lenet = trainModel(40)
+    losses = []
+    for x in (x_train):
+        #forwards
+        y_prim = model.forward(x)
+        loss = criteria(y_prim, y)
+
+        #backwards
+        loss.backward()
+
+        #update
+        optimizer.step()
+        optimizer.zero_grad()
+
+    if (epoch+1) % 10 ==0:
+        print(f'epoch: {epoch+1}, loss = {loss.item():.4f}')
+
+#plot
+#predicted = model(x).detach().numpy()
+#plt.plot(x)
