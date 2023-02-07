@@ -74,7 +74,7 @@ class BayesianNet(torch.nn.Module):
 
     def forward(self, x):
         z = torch.relu(self.hid1(x))
-        z = self.oupt(z)  # no softmax: CrossEntropyLoss()
+        z = self.oupt(z)
         return z
 ~~~
 Loss:
@@ -115,4 +115,80 @@ Epochs:
 ~~~
 Graph:
 ![11_using-torchbnn.PNG](..%2Fmedia%2F11_using-torchbnn.PNG)
-*ļoti ātri aizgaja līdz 0.
+*ļoti ātri aizgaja līdz 0..
+
+### Paša mēģinājums - fails
+
+Es ar encodes un decoder darbiem esmu galīgi apjucis kā jātaisa nn modelis priekš regresijas uzdevuma.
+
+Nekas no šī nestrādā:
+
+1. mēginu uztaisīt bayes layer: 
+~~~
+class BayesLinear():
+
+    def __init__(self, in_features: int, out_features: int, prior_mu, prior_sigma):
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.prior_mu = prior_mu
+        self.prior_sigma = prior_sigma
+
+        self.w_mu = torch.nn.Linear(
+            in_features=self.in_features,
+            out_features=1
+        )
+        self.w_sigma = torch.nn.Linear(
+            in_features=self.in_features,
+            out_features=1
+        )
+
+    def forward(self, x):
+        eps = torch.normal(mean=0.0, std=1.0, size=self.w_mu.size())
+        z = self.w_mu + self.w_sigma * eps
+        return z
+~~~
+
+2. Mēģinu uztasiīt nn modeli:
+~~~
+class BayesianModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+        self.hid1 = BayesLinear(prior_mu=mu, prior_sigma=sigma,
+                                    in_features=NUMBER_OF_FEATURES, out_features=16)
+        self.out = BayesLinear(prior_mu=mu, prior_sigma=sigma,
+                                    in_features=16, out_features=1)
+
+    def forward(self, x):
+        z = self.hid1(x)
+        z = torch.relu(z)
+        z = self.out(z)
+
+        return z #, z_mu, z_sigma for kl loss
+
+    #TODO Jautājums: Te vajag backward function?
+~~~
+
+Talak netieku, jo saņemu erroru:
+"ValueError: optimizer got an empty parameter list"
+
+Par šo arī jautajums - kā modelī tiek pievienoti parametri?
+
+3. Mēģinu uztaisīt kl loss funkciju: (nemaz netiku līdz šim jo forward nestrada)
+~~~
+class BKLLoss():
+
+    def __init__(self):
+        self.y_prim = None
+
+    def forward(self, z_sigma, z_mu):
+        torch.mean(VAE_BETA * torch.mean(
+            (-0.5 * (2.0 * torch.log(z_sigma + 1e-8) - z_sigma ** 2 - z_mu ** 2 + 1))
+        ), dim=0)
+
+    def backward(self):
+        # TODO
+        print("Backward")
+~~~

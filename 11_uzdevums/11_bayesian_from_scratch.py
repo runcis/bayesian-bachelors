@@ -1,11 +1,7 @@
 import numpy as np
 import torch
-import sklearn.model_selection
 from sklearn import datasets
-from matplotlib import pyplot
 import torchbnn as bnn
-
-import scipy.stats
 import matplotlib.pyplot as plt
 
 BATCH_SIZE = 128
@@ -19,11 +15,6 @@ print(housing.feature_names)
 
 x = housing.data
 y = housing.target
-
-
-# x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y, test_size=0.2)
-# x = torch.from_numpy(x.astype(np.float32))
-# y = torch.from_numpy(y.astype(np.float32))
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -74,25 +65,80 @@ def linear(W, b, x):
     return prod_W + b
 
 
-mu = 10
-sigma = 2.
+mu = 0
+sigma = 1
 
+class BayesLinear():
 
-class BayesianNet(torch.nn.Module):
-    def __init__(self):  # 4-100-3
-        super(BayesianNet, self).__init__()
-        self.hid1 = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1,
-                                    in_features=8, out_features=16)
-        self.oupt = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1,
-                                    in_features=16, out_features=1)
+    def __init__(self, in_features: int, out_features: int, prior_mu, prior_sigma):
+        self.in_features = in_features
+        self.out_features = out_features
+
+        self.prior_mu = prior_mu
+        self.prior_sigma = prior_sigma
+
+        self.w_mu = torch.nn.Linear(
+            in_features=self.in_features,
+            out_features=1
+        )
+        self.w_sigma = torch.nn.Linear(
+            in_features=self.in_features,
+            out_features=1
+        )
 
     def forward(self, x):
-        z = torch.relu(self.hid1(x))
-        z = self.oupt(z)  # no softmax: CrossEntropyLoss()
+        eps = torch.normal(mean=0.0, std=1.0, size=self.w_mu.size())
+        z = self.w_mu + self.w_sigma * eps
         return z
 
 
-model = BayesianNet()
+class BayesianModel(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+        self.hid1 = BayesLinear(prior_mu=mu, prior_sigma=sigma,
+                                    in_features=NUMBER_OF_FEATURES, out_features=16)
+        self.out = BayesLinear(prior_mu=mu, prior_sigma=sigma,
+                                    in_features=16, out_features=1)
+
+    def forward(self, x):
+        z = self.hid1(x)
+        z = torch.relu(z)
+        z = self.out(z)
+
+        return z #, z_mu, z_sigma for kl loss
+
+    #TODO Jautājums: Te vajag backward function?
+
+class LossCrossEntropy():
+    def __init__(self):
+        self.y_prim = None
+
+    def forward(self, y, y_prim):
+        self.y = y
+        self.y_prim = y_prim
+        return np.mean(-y.value * np.log(y_prim.value + 1e-8))
+
+    def backward(self):
+         self.y_prim.grad = -self.y.value / (self.y_prim.value + 1e-8)
+
+class BKLLoss():
+
+    def __init__(self):
+        self.y_prim = None
+
+    def forward(self, z_sigma, z_mu):
+        torch.mean(VAE_BETA * torch.mean(
+            (-0.5 * (2.0 * torch.log(z_sigma + 1e-8) - z_sigma ** 2 - z_mu ** 2 + 1))
+        ), dim=0)
+
+    def backward(self):
+        # TODO
+        print("Backward")
+
+
+model = BayesianModel()
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=LEARNING_RATE
@@ -118,7 +164,7 @@ for epoch in range(1, 1000):
 
             cel = ce_loss(y_prim, y)
             kll = kl_loss(model)
-            loss = cel + (0.10 * kll)
+            loss = cel + kll # kll* .1 - why should we reduce?
 
             losses.append(loss.item())# accumulate
 
