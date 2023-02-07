@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 BATCH_SIZE = 128
 LEARNING_RATE = 0.001
 TRAIN_TEST_SPLIT = 0.7
+NUMBER_OF_FEATURES = 8
 
 housing = datasets.fetch_california_housing()
 print(housing.feature_names)
@@ -74,16 +75,14 @@ class Model(torch.nn.Module):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(in_features=8, out_features=8),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=8, out_features=16),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=16, out_features=8),
+
+            torch.nn.Linear(in_features=NUMBER_OF_FEATURES, out_features=8),
             torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=8, out_features=4),
             torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=4, out_features=1),
-            torch.nn.Softmax()
+            torch.nn.Sigmoid(),
+            torch.nn.Tanh()
         )
 
         self.nn_layers = torch.nn.ModuleList()
@@ -93,8 +92,6 @@ class Model(torch.nn.Module):
         for layer in self.layers:
             out = layer.forward(out)
         return out
-        # y_prim = self.layers.forward(x)
-        # return y_prim
 
     def backward(self):
         for layer in reversed(self.layers):
@@ -102,7 +99,7 @@ class Model(torch.nn.Module):
 
 
 
-model = torch.nn.Linear(8, 1)#Model()
+model = Model()
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=LEARNING_RATE

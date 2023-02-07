@@ -2,7 +2,7 @@
 
 Sākumā mēģināju uztaisīt parastu modeli, kas peredzēs māju cenu no dotajiem atribūtiem.
 
-Man kkas nesanāca - daudz cīnijos ar datuseta importēšanu - nebiju lietojis sklearn:
+Daudz cīnijos ar datuseta importēšanu - nebiju lietojis sklearn:
 ~~~
 housing = datasets.fetch_california_housing()
 print(housing.feature_names)
@@ -28,16 +28,14 @@ class Model(torch.nn.Module):
         super().__init__()
 
         self.layers = torch.nn.Sequential(
-            torch.nn.Linear(in_features=8, out_features=8),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=8, out_features=16),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=16, out_features=8),
+
+            torch.nn.Linear(in_features=NUMBER_OF_FEATURES, out_features=8),
             torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=8, out_features=4),
             torch.nn.Sigmoid(),
             torch.nn.Linear(in_features=4, out_features=1),
-            torch.nn.Softmax()
+            torch.nn.Sigmoid(),
+            torch.nn.Tanh()
         )
 
         self.nn_layers = torch.nn.ModuleList()
@@ -47,8 +45,6 @@ class Model(torch.nn.Module):
         for layer in self.layers:
             out = layer.forward(out)
         return out
-        # y_prim = self.layers.forward(x)
-        # return y_prim
 
     def backward(self):
         for layer in reversed(self.layers):
@@ -62,12 +58,5 @@ optimizer = torch.optim.Adam(
 )
 criteria = torch.nn.MSELoss()
 ~~~
-Bet rezultāts izskatās nepareizs:
-![11_failed_linear_model.PNG](..%2Fmedia%2F11_failed_linear_model.PNG)
-
-Tad nomainīju modeli uz 
-~~~
-model = torch.nn.Linear(8, 1)
-~~~
-Rezultāts izskatās ticamāks: 
-![11_torch_linear.PNG](..%2Fmedia%2F11_torch_linear.PNG)
+Rezultāts izskatās šādi:
+![11_linear_model.PNG](..%2Fmedia%2F11_linear_model.PNG)
