@@ -3,13 +3,14 @@ import torch
 import sklearn.model_selection
 from sklearn import datasets
 from matplotlib import pyplot
+import torchbnn as bnn
 
 import scipy.stats
 import matplotlib.pyplot as plt
 
-
 BATCH_SIZE = 128
 LEARNING_RATE = 0.001
+VAE_BETA = 0.001
 TRAIN_TEST_SPLIT = 0.7
 NUMBER_OF_FEATURES = 8
 
@@ -19,9 +20,10 @@ print(housing.feature_names)
 x = housing.data
 y = housing.target
 
-#x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y, test_size=0.2)
-#x = torch.from_numpy(x.astype(np.float32))
-#y = torch.from_numpy(y.astype(np.float32))
+
+# x_train, x_test, y_train, y_test = sklearn.model_selection.train_test_split(x, y, test_size=0.2)
+# x = torch.from_numpy(x.astype(np.float32))
+# y = torch.from_numpy(y.astype(np.float32))
 
 
 class Dataset(torch.utils.data.Dataset):
@@ -34,7 +36,6 @@ class Dataset(torch.utils.data.Dataset):
         Y = torch.LongTensor(Y.astype(np.float32))
         self.Y = Y.unsqueeze(dim=-1)
 
-
     def __len__(self):
         return len(self.X)
 
@@ -42,7 +43,7 @@ class Dataset(torch.utils.data.Dataset):
         x = self.X[idx]
 
         y = self.Y[idx]
-        y= y.float()
+        y = y.float()
 
         return x, y
 
@@ -67,44 +68,38 @@ dataloader_test = torch.utils.data.DataLoader(
     shuffle=False
 )
 
+
+def linear(W, b, x):
+    prod_W = np.squeeze(W.T @ np.expand_dims(x, axis=-1), axis=-1)
+    return prod_W + b
+
+
 mu = 10
 sigma = 2.
 
-class Model(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
 
-        self.layers = torch.nn.Sequential(
-
-            torch.nn.Linear(in_features=NUMBER_OF_FEATURES, out_features=8),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=8, out_features=4),
-            torch.nn.Sigmoid(),
-            torch.nn.Linear(in_features=4, out_features=1),
-            torch.nn.Sigmoid(),
-            torch.nn.Tanh()
-        )
-
-        self.nn_layers = torch.nn.ModuleList()
+class BayesianNet(torch.nn.Module):
+    def __init__(self):  # 4-100-3
+        super(BayesianNet, self).__init__()
+        self.hid1 = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1,
+                                    in_features=8, out_features=16)
+        self.oupt = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1,
+                                    in_features=16, out_features=1)
 
     def forward(self, x):
-        out = x
-        for layer in self.layers:
-            out = layer.forward(out)
-        return out
-
-    def backward(self):
-        for layer in reversed(self.layers):
-            layer.backward()
+        z = torch.relu(self.hid1(x))
+        z = self.oupt(z)  # no softmax: CrossEntropyLoss()
+        return z
 
 
-
-model = Model()
+model = BayesianNet()
 optimizer = torch.optim.Adam(
     model.parameters(),
     lr=LEARNING_RATE
 )
-criteria = torch.nn.MSELoss()
+
+ce_loss = torch.nn.CrossEntropyLoss()   # applies softmax()
+kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
 
 loss_plot_train = []
 loss_plot_test = []
@@ -112,15 +107,23 @@ for epoch in range(1, 1000):
 
     for dataloader in [dataloader_train, dataloader_test]:
         losses = []
+
+        stage = 'train'
+        if dataloader == dataloader_test:
+            stage = 'test'
+
         for x, y in dataloader:
 
-            y_prim = model.forward(x)
-            loss = criteria.forward(y_prim, y)
+            y_prim = model(x)
 
-            losses.append(loss.item())
+            cel = ce_loss(y_prim, y)
+            kll = kl_loss(model)
+            loss = cel + (0.10 * kll)
+
+            losses.append(loss.item())# accumulate
 
             if dataloader == dataloader_train:
-                loss.backward()
+                loss.backward()  # update wt distribs
                 optimizer.step()
                 optimizer.zero_grad()
 
