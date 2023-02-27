@@ -68,9 +68,10 @@ def linear(W, b, x):
 mu = 0
 sigma = 1
 
-class BayesLinear():
+class BayesLinear(torch.nn.Module):
 
     def __init__(self, in_features: int, out_features: int, prior_mu, prior_sigma):
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
 
@@ -79,17 +80,19 @@ class BayesLinear():
 
         self.w_mu = torch.nn.Linear(
             in_features=self.in_features,
-            out_features=1
+            out_features=out_features
         )
         self.w_sigma = torch.nn.Linear(
             in_features=self.in_features,
-            out_features=1
+            out_features=out_features
         )
 
     def forward(self, x):
         eps = torch.normal(mean=0.0, std=1.0, size=self.w_mu.size())
-        z = self.w_mu + self.w_sigma * eps
-        return z
+        sigma = self.w_sigma.forward(x)
+        mu = self.w_mu.forward(x)
+        z = mu + sigma * eps
+        return z, mu, sigma
 
 
 class BayesianModel(torch.nn.Module):
