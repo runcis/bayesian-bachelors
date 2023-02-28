@@ -3,7 +3,7 @@ Variational inference vs Montecarlo dropout
 Mēģināju izveidot balstoties uz šo paraugu: https://github.com/Harry24k/bayesian-neural-network-pytorch/blob/master/demos/Bayesian%20Neural%20Network%20Regression.ipynb
 Bet sastapos ar problemu ka izmantoju viarāku mainīgo datusetu.
 
-Modelis BVI:
+### Modelis BVI:
 ~~~
 class BayesianNet(torch.nn.Module):
     def __init__(self):
@@ -25,7 +25,7 @@ optimizer = torch.optim.Adam(
 )
 ~~~
 
-Modelis MCD:
+### Modelis MCD:
 ~~~
 class MonteCarloNet(torch.nn.Module):
     def __init__(self):
@@ -43,7 +43,7 @@ class MonteCarloNet(torch.nn.Module):
         return z
 ~~~
 
-Trenēšana BVI:
+### Trenēšana BVI:
 ~~~
 mse_loss = torch.nn.MSELoss()   # applies softmax()
 kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
@@ -68,7 +68,7 @@ for epoch in range(1, 300):
 
 ~~~
 
-Trenēšana MCD:
+### Trenēšana MCD:
 ~~~
 mse_loss = torch.nn.MSELoss()
 loss_plot_train = []
@@ -88,7 +88,7 @@ for epoch in range(1, 1000):
         loss_plot_train.append(np.mean(loss.item()))
 ~~~
 
-Testēšana BVI:
+### Testēšana BVI:
 ~~~
 for x, y in dataloader_test:
     plt.scatter(y, range(len(y)), color='b')
@@ -119,7 +119,7 @@ plt.show()
 ~~~
 ![true_vs_predicted.PNG](..%2Fmedia%2Ftrue_vs_predicted.PNG)
 
-Testēšana MCD:
+### Testēšana MCD:
 ~~~
 for x, y in dataloader_test:
     plt.scatter(y, range(len(y)), color='b')
@@ -138,32 +138,38 @@ for x, y in dataloader_test:
 ![concrete-mcd.PNG](..%2Fmedia%2Fconcrete-mcd.PNG)
 Pievienojot std grafikam:
 ~~~
-x0 = dataloader_test.dataset[0][0]
-y0 = dataloader_test.dataset[0][1]
+for x, y in dataloader_test:
+    plt.scatter(y, range(len(y)), color='b')
 
-x0_result = np.array([model(x0).data.numpy() for k in range(500)])
-x0_result = x0_result[:,0]
+    models_result = np.array([model(x).data.numpy() for k in range(500)])
+    models_result = models_result[:, :, 0]
+    models_result = models_result.T
 
-sns.displot(x=x0_result, kind="kde", color='green', label="Predicted range")
-plt.axvline(x=y0.data.numpy(), color='red')
-plt.title("True data vs predicted distribution")
-plt.show()
+    mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
+    std_values = np.array([models_result[i].std() for i in range(len(models_result))])
+
+    plt.scatter(y.data.numpy(), mean_values, color='g', lw=1, label='Predicted Mean Model')
+    plt.errorbar(y.data.numpy(), mean_values, yerr=std_values, fmt="o")
+    plt.title("True data vs predicted with std")
+    plt.show()
 ~~~
 ![mean_w_std_vs_actual.PNG](..%2Fmedia%2Fmean_w_std_vs_actual.PNG)
 
 
 ##### Atvērtie jautajumi par BVI:
 
-Vai ir izvelets labs datuset? *visos piemeros bvi redzu tikai 1 parametra funkcijas.
+Vai ir izvelets labs datuset? *visos piemeros bvi redzu tikai 1 parametra funkcijas un pārsvarā klasifikācija uzdevumi nevis regresija.
 Nesaprotu kā strādā tas vairāku mainīgo BNN - mēs hardkodējam mu un prior - vai tas tiek pievienots katram inputam?
 Šis liekas ka nav pareizi, jo KL nesamazinas.
 
+Nesaprotu kā pievienot mu un sigma kā apmācāmus parametrus.
+
 ##### Atvertie jautajumi par MCD:
-Vai ideju esmu sapratis pareizi - Tiek veidots tīkls, kuram ir dropout slāņi un varbūtība tiek iegūta atkārtojot mērijumu ar tīklu.
+Vai ideju esmu sapratis pareizi - Tiek veidots tīkls, kuram ir dropout slāņi un varbūtība tiek iegūta atkārtojot mērijumu ar tīklu un izvelkot mean un std.
 
 
 ##### Atvertie jautājumi par Bayes by Backprop:
-TODO: Man vel vajag izmeklēt, sākumā apjuku kā tas atšķiras no BVI.
+TODO: Man vel vajag izmeklēt, Esmu apjucis - kā tas atšķiras no BVI.
 
 
 ##### Papildu jautājumi:

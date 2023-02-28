@@ -118,5 +118,6 @@ for x, y in dataloader_test:
 
     plt.scatter(y.data.numpy(), mean_values, color='g', lw=1, label='Predicted Mean Model')
     plt.errorbar(y.data.numpy(), mean_values, yerr=std_values, fmt="o")
+    plt.title("True data vs predicted with std")
     plt.show()
 
