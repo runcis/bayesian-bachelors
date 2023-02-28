@@ -36,7 +36,7 @@ class DatasetConcrete(torch.utils.data.Dataset):
 
 
 dataset_full = DatasetConcrete()
-train_test_split = int(len(dataset_full) * 0.8)
+train_test_split = int(len(dataset_full) * 0.9)
 dataset_train, dataset_test = torch.utils.data.random_split(
     dataset_full,
     [train_test_split, len(dataset_full) - train_test_split],
@@ -65,7 +65,10 @@ class MonteCarloNet(torch.nn.Module):
             torch.nn.Linear( in_features=8, out_features=16),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.2),
-            torch.nn.Linear( in_features=16, out_features=1),
+            torch.nn.Linear( in_features=16, out_features=8),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.2),
+            torch.nn.Linear( in_features=8, out_features=1),
         )
 
     def forward(self, x):
@@ -82,7 +85,7 @@ optimizer = torch.optim.Adam(
 mse_loss = torch.nn.MSELoss()
 loss_plot_train = []
 
-for epoch in range(1, 1000):
+for epoch in range(1, 2000):
 
     for x, y in dataloader_train:
 
@@ -96,21 +99,24 @@ for epoch in range(1, 1000):
 
         loss_plot_train.append(np.mean(loss.item()))
 
+fig, ax1 = plt.subplots()
+ax1.plot(loss_plot_train, 'r-', label='train')
+ax1.legend()
+ax1.set_xlabel("Epoch")
+ax1.set_ylabel("Loss")
+plt.show()
 
 for x, y in dataloader_test:
     plt.scatter(y, range(len(y)), color='b')
 
-    models_result = np.array([model(x).data.numpy() for k in range(100)])
+    models_result = np.array([model(x).data.numpy() for k in range(500)])
     models_result = models_result[:, :, 0]
     models_result = models_result.T
 
     mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
     std_values = np.array([models_result[i].std() for i in range(len(models_result))])
-    plt.scatter(y.data.numpy(), mean_values, color='g', lw=3, label='Predicted Mean Model')
+
+    plt.scatter(y.data.numpy(), mean_values, color='g', lw=1, label='Predicted Mean Model')
+    plt.errorbar(y.data.numpy(), mean_values, yerr=std_values, fmt="o")
     plt.show()
-
-
-    # sns.kdeplot(np.hstack(models_result), shade=True)
-    # plt.axvline(models_result.mean(axis=1), color='red')
-    # plt.show()
 

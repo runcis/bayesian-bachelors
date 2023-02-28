@@ -103,27 +103,75 @@ for x, y in dataloader_test:
     plt.show()
 
 ~~~
-
 ![concrete-bayes-inf.PNG](..%2Fmedia%2Fconcrete-bayes-inf.PNG)
+
+~~~
+x0 = dataloader_test.dataset[0][0]
+y0 = dataloader_test.dataset[0][1]
+
+x0_result = np.array([model(x0).data.numpy() for k in range(500)])
+x0_result = x0_result[:,0]
+
+sns.displot(x=x0_result, kind="kde", color='green', label="Predicted range")
+plt.axvline(x=y0.data.numpy(), color='red')
+plt.title("True data vs predicted distribution")
+plt.show()
+~~~
+![true_vs_predicted.PNG](..%2Fmedia%2Ftrue_vs_predicted.PNG)
 
 Testēšana MCD:
 ~~~
 for x, y in dataloader_test:
     plt.scatter(y, range(len(y)), color='b')
 
-    models_result = np.array([model(x).data.numpy() for k in range(100)])
+    models_result = np.array([model(x).data.numpy() for k in range(500)])
     models_result = models_result[:, :, 0]
     models_result = models_result.T
 
     mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
     std_values = np.array([models_result[i].std() for i in range(len(models_result))])
-    plt.scatter(y.data.numpy(), mean_values, color='g', lw=3, label='Predicted Mean Model')
+
+    plt.scatter(y.data.numpy(), mean_values, color='g', lw=1, label='Predicted Mean Model')
+    plt.errorbar(y.data.numpy(), mean_values, yerr=std_values, fmt="o")
     plt.show()
 ~~~
+![concrete-mcd.PNG](..%2Fmedia%2Fconcrete-mcd.PNG)
+Pievienojot std grafikam:
+~~~
+x0 = dataloader_test.dataset[0][0]
+y0 = dataloader_test.dataset[0][1]
 
-Atvērtie jautajumi:
+x0_result = np.array([model(x0).data.numpy() for k in range(500)])
+x0_result = x0_result[:,0]
+
+sns.displot(x=x0_result, kind="kde", color='green', label="Predicted range")
+plt.axvline(x=y0.data.numpy(), color='red')
+plt.title("True data vs predicted distribution")
+plt.show()
+~~~
+![mean_w_std_vs_actual.PNG](..%2Fmedia%2Fmean_w_std_vs_actual.PNG)
+
+
+##### Atvērtie jautajumi par BVI:
+
 Vai ir izvelets labs datuset? *visos piemeros bvi redzu tikai 1 parametra funkcijas.
-Kā analizēt un novērtēt vērtību sadalījumu start dažādām pieejam? 
+Nesaprotu kā strādā tas vairāku mainīgo BNN - mēs hardkodējam mu un prior - vai tas tiek pievienots katram inputam?
+Šis liekas ka nav pareizi, jo KL nesamazinas.
 
+##### Atvertie jautajumi par MCD:
+Vai ideju esmu sapratis pareizi - Tiek veidots tīkls, kuram ir dropout slāņi un varbūtība tiek iegūta atkārtojot mērijumu ar tīklu.
+
+
+##### Atvertie jautājumi par Bayes by Backprop:
+TODO: Man vel vajag izmeklēt, sākumā apjuku kā tas atšķiras no BVI.
+
+
+##### Papildu jautājumi:
+Kā analizēt un novērtēt vērtību sadalījumu starp dažādām pieejam? 
+    idejas: 
+    <ol>
+        <li>cik liela daļa no rezultātiem iekļaujas ~98%</li>
+        <li>cik resursu pieprasošs ir risinājums</li>
+    </ol>
 
 

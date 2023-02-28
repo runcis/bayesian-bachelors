@@ -2,6 +2,7 @@ import torch
 import pymc3
 import numpy as np
 import matplotlib
+import seaborn as sns
 import matplotlib.pyplot as plt
 import csv
 import torchbnn as bnn
@@ -37,7 +38,7 @@ class DatasetConcrete(torch.utils.data.Dataset):
 
 
 dataset_full = DatasetConcrete()
-train_test_split = int(len(dataset_full) * 0.8)
+train_test_split = int(len(dataset_full) * 0.99)
 dataset_train, dataset_test = torch.utils.data.random_split(
     dataset_full,
     [train_test_split, len(dataset_full) - train_test_split],
@@ -61,14 +62,17 @@ dataloader_test = torch.utils.data.DataLoader(
 class BayesianNet(torch.nn.Module):
     def __init__(self):
         super(BayesianNet, self).__init__()
-        self.hid1 = bnn.BayesLinear(prior_mu=30, prior_sigma=1,
+        self.hid1 = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
                                     in_features=8, out_features=16)
-        self.oupt = bnn.BayesLinear(prior_mu=30, prior_sigma=1,
-                                    in_features=16, out_features=1)
+        self.hid2 = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
+                                    in_features=16, out_features=8)
+        self.oupt = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
+                                    in_features=8, out_features=1)
 
     def forward(self, x):
         z = torch.relu(self.hid1(x))
-        z = self.oupt(z)  # no softmax: CrossEntropyLoss()
+        z = torch.relu(self.hid2(z))
+        z = self.oupt(z)
         return z
 
 model = BayesianNet()
@@ -79,6 +83,7 @@ optimizer = torch.optim.Adam(
 
 # Define the Loss functions
 mse_loss = torch.nn.MSELoss()   # applies softmax()
+loss_huber = torch.nn.HuberLoss()
 kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
 kl_weight = 0.1
 
@@ -89,31 +94,43 @@ for epoch in range(1, 1000):
 
         y_prim = model(x)
 
-        cel = mse_loss(y_prim, y)
+        cel = loss_huber(y_prim, y)
         kll = kl_loss(model)
-        loss = cel + kll # kll* .1 - why should we reduce?
+        loss = cel + kll * .1 # kll* .1 - why should we reduce?
 
-        losses.append(loss.item())# accumulate
+        losses.append(loss.item())
 
-        loss.backward()  # update wt distribs
+        loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
-# correct = (predicted == y).sum()
-# print('- Accuracy: %f %%' % (100 * float(correct) / total))
-# print('- CE : %2.2f, KL : %2.2f' % (ce.item(), kl.item()))
+# print('- CE : %2.2f, KL : %2.2f' % (cel.item(), kll.item()))
 
-for x, y in dataloader_test:
-    plt.scatter(y, range(len(y)), color='b')
+x0 = dataloader_test.dataset[0][0]
+y0 = dataloader_test.dataset[0][1]
 
-    models_result = np.array([model(x).data.numpy() for k in range(100)])
-    models_result = models_result[:, :, 0]
-    models_result = models_result.T
+x0_result = np.array([model(x0).data.numpy() for k in range(500)])
+x0_result = x0_result[:,0]
 
-    mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
-    std_values = np.array([models_result[i].std() for i in range(len(models_result))])
-    plt.scatter(y.data.numpy(), mean_values, color='g', lw=3, label='Predicted Mean Model')
-    plt.show()
+sns.displot(x=x0_result, kind="kde", color='green', label="Predicted range")
+plt.axvline(x=y0.data.numpy(), color='red')
+plt.title("True data vs predicted distribution")
+plt.show()
+
+# for x, y in dataloader_test:
+#     plt.scatter(y, range(len(y)), color='b')
+#
+#     models_result = np.array([model(x).data.numpy() for k in range(100)])
+#     models_result = models_result[:, :, 0]
+#     models_result = models_result.T
+#
+#     mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
+#     std_values = np.array([models_result[i].std() for i in range(len(models_result))])
+#
+#     sns.displot(data=dataset_full.Y, x=dataset_full.X[:, 0], kind="kde", color='green', label="True Data")
+#
+#     sns.displot(data=mean_values, x = x[:,0], kind="kde", color='red', label="Predicted")
+#     plt.show()
 
 
 
