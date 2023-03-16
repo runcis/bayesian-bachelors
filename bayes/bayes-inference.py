@@ -1,14 +1,13 @@
 import torch
-import pymc3
+import pymc3 as pm
 import numpy as np
-import matplotlib
-import seaborn as sns
 import matplotlib.pyplot as plt
 import csv
-import torchbnn as bnn
 data_path = "../data/Concrete_Data.csv"
 
 LEARNING_RATE = 0.001
+TEST_TRAIN_SPLIT = 0.9
+INPUT_COUNT = 8
 class DatasetConcrete(torch.utils.data.Dataset):
     def __init__(self):
         super().__init__()
@@ -38,100 +37,59 @@ class DatasetConcrete(torch.utils.data.Dataset):
 
 
 dataset_full = DatasetConcrete()
-train_test_split = int(len(dataset_full) * 0.99)
+
+dataset_full = DatasetConcrete()
+train_test_split = int(len(dataset_full) * TEST_TRAIN_SPLIT)
 dataset_train, dataset_test = torch.utils.data.random_split(
     dataset_full,
     [train_test_split, len(dataset_full) - train_test_split],
     generator=torch.Generator().manual_seed(0)
 )
 
-dataloader_train = torch.utils.data.DataLoader(
-    dataset=dataset_train,
-    batch_size=128,
-    shuffle=True,
-    drop_last=(len(dataset_train) % 128 == 1)
-)
+train_x, train_y = zip(*dataset_train)
+train_x=torch.stack(list(train_x), dim=0)
+train_y=torch.stack(list(train_y), dim=0)
+test_x, test_y = zip(*dataset_test)
+test_x=torch.stack(list(test_x), dim=0)
+test_y=torch.stack(list(test_y), dim=0)
 
-dataloader_test = torch.utils.data.DataLoader(
-    dataset=dataset_test,
-    batch_size=128,
-    shuffle=True,
-    drop_last=(len(dataset_test) % 128 == 1)
-)
+X_full = dataset_full.X
+Y_full = dataset_full.Y
 
-class BayesianNet(torch.nn.Module):
-    def __init__(self):
-        super(BayesianNet, self).__init__()
-        self.hid1 = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
-                                    in_features=8, out_features=16)
-        self.hid2 = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
-                                    in_features=16, out_features=8)
-        self.oupt = bnn.BayesLinear(prior_mu=50, prior_sigma=0.1,
-                                    in_features=8, out_features=1)
+# Define the model using PyMC
+# 3
+with pm.Model() as model:
+    X = pm.Data('X', train_x)
 
-    def forward(self, x):
-        z = torch.relu(self.hid1(x))
-        z = torch.relu(self.hid2(z))
-        z = self.oupt(z)
-        return z
+    # Define the priors
+    w = pm.Normal('w', mu=0, sd=1, shape=INPUT_COUNT)
 
-model = BayesianNet()
-optimizer = torch.optim.Adam(
-    model.parameters(),
-    lr=LEARNING_RATE
-)
+    # Define prior for the bias term
+    b = pm.Normal('b', mu=0, sd=1)
 
-# Define the Loss functions
-mse_loss = torch.nn.MSELoss()   # applies softmax()
-loss_huber = torch.nn.HuberLoss()
-kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
-kl_weight = 0.1
+    # Define the likelihood function
+    mu = pm.math.dot(X, w) + b
+    sigma = pm.HalfNormal('sigma', 1, shape=1)
+    y_pred = pm.Normal('y_obs', mu=mu, sigma=sigma, observed=train_y)
 
-for epoch in range(1, 1000):
-    losses = []
+    # Run the inference algorithm
+    approx = pm.fit(20000, method='advi')
 
-    for x, y in dataloader_train:
+    # Draw samples from the posterior distribution
+    trace = approx.sample(draws=1000)
 
-        y_prim = model(x)
 
-        cel = loss_huber(y_prim, y)
-        kll = kl_loss(model)
-        loss = cel + kll * .1 # kll* .1 - why should we reduce?
+with model:
+    pm.set_data({'X': test_x})
+    ppc = pm.sample_posterior_predictive(trace)
+    y_pred = ppc['y_obs'].mean(axis=0)
+    output_std = torch.mean(ppc['y_obs'].std(axis=0))
+    test_loss = torch.sqrt(torch.mean((test_y - y_pred) ** 2))
 
-        losses.append(loss.item())
 
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+print("Test msr error: ", test_loss.item())
 
-# print('- CE : %2.2f, KL : %2.2f' % (cel.item(), kll.item()))
-
-x0 = dataloader_test.dataset[0][0]
-y0 = dataloader_test.dataset[0][1]
-
-x0_result = np.array([model(x0).data.numpy() for k in range(500)])
-x0_result = x0_result[:,0]
-
-sns.displot(x=x0_result, kind="kde", color='green', label="Predicted range")
-plt.axvline(x=y0.data.numpy(), color='red')
-plt.title("True data vs predicted distribution")
-plt.show()
-
-# for x, y in dataloader_test:
-#     plt.scatter(y, range(len(y)), color='b')
-#
-#     models_result = np.array([model(x).data.numpy() for k in range(100)])
-#     models_result = models_result[:, :, 0]
-#     models_result = models_result.T
-#
-#     mean_values = np.array([models_result[i].mean() for i in range(len(models_result))])
-#     std_values = np.array([models_result[i].std() for i in range(len(models_result))])
-#
-#     sns.displot(data=dataset_full.Y, x=dataset_full.X[:, 0], kind="kde", color='green', label="True Data")
-#
-#     sns.displot(data=mean_values, x = x[:,0], kind="kde", color='red', label="Predicted")
-#     plt.show()
-
+print("average STD: ", output_std)
 
 
 
