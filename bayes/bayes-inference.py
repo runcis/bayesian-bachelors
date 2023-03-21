@@ -1,95 +1,69 @@
-import torch
-import pymc3 as pm
+import pandas as pd
 import numpy as np
+import pymc3 as pm
+import arviz as az
 import matplotlib.pyplot as plt
-import csv
-data_path = "../data/Concrete_Data.csv"
 
-LEARNING_RATE = 0.001
-TEST_TRAIN_SPLIT = 0.9
-INPUT_COUNT = 8
-class DatasetConcrete(torch.utils.data.Dataset):
-    def __init__(self):
-        super().__init__()
-        path_dataset = '../data/Concrete_Data.csv'
+TEST_TRAIN_SPLIT = .8
+MODEL_ITERATION = 10000
+POSTERIOR_SAMPLES = 500
+PERCENT_OF_MIXED_LABELS = 0.3
 
-        concrete_data = np.loadtxt(data_path, dtype=np.float32, delimiter=",", skiprows=1,
-                                   usecols=(0, 1, 2, 3, 4, 5, 6, 7))
-        concrete_strength = np.loadtxt(data_path, dtype=np.float32, delimiter=",", skiprows=1, usecols=(8))
-        labels = next(csv.reader(open(data_path, encoding='utf-8-sig'), delimiter=","))
+# Load the mushroom dataset
+data = pd.read_csv("../data/mushrooms.csv")
 
-        X = torch.from_numpy(concrete_data).float()
-        Y = torch.from_numpy(concrete_strength).float()
+# Set column names
+col_names = ['class', 'cap-shape', 'cap-surface', 'cap-color', 'bruises', 'odor', 'gill-attachment',
+             'gill-spacing', 'gill-size', 'gill-color', 'stalk-shape', 'stalk-root', 'stalk-surface-above-ring',
+             'stalk-surface-below-ring', 'stalk-color-above-ring', 'stalk-color-below-ring', 'veil-type',
+             'veil-color', 'ring-number', 'ring-type', 'spore-print-color', 'population', 'habitat']
+data.columns = col_names
 
-        self.X = X
-        self.Y = Y
+# Convert categorical features to numeric
+for col in data.columns:
+    data[col] = pd.Categorical(data[col]).codes
 
-    def __len__(self):
-        return len(self.X)
+X = data.drop('class', axis=1)
+X = np.array(X)
+y = data['class']
 
-    def __getitem__(self, idx):
-        x = self.X[idx]
-        y = self.Y[idx]
+train_size = int(len(data) * TEST_TRAIN_SPLIT)
+train_data = data.iloc[:train_size, :]
+test_data = data.iloc[train_size:, :]
 
-        # self.applyNoise(x)
+# mix class label randomly
+num_train = len(train_data)
+num_to_mix = int(num_train*PERCENT_OF_MIXED_LABELS)
+mix_indices = np.random.choice(num_train, num_to_mix, replace=False)
+for idx in mix_indices:
+    train_data.at[idx, 'class'] = 1 - train_data.at[idx, 'class']
 
-        return x, y
-
-
-dataset_full = DatasetConcrete()
-
-dataset_full = DatasetConcrete()
-train_test_split = int(len(dataset_full) * TEST_TRAIN_SPLIT)
-dataset_train, dataset_test = torch.utils.data.random_split(
-    dataset_full,
-    [train_test_split, len(dataset_full) - train_test_split],
-    generator=torch.Generator().manual_seed(0)
-)
-
-train_x, train_y = zip(*dataset_train)
-train_x=torch.stack(list(train_x), dim=0)
-train_y=torch.stack(list(train_y), dim=0)
-test_x, test_y = zip(*dataset_test)
-test_x=torch.stack(list(test_x), dim=0)
-test_y=torch.stack(list(test_y), dim=0)
-
-X_full = dataset_full.X
-Y_full = dataset_full.Y
-
-# Define the model using PyMC
-# 3
+# Define the model
 with pm.Model() as model:
-    X = pm.Data('X', train_x)
 
-    # Define the priors
-    w = pm.Normal('w', mu=0, sd=1, shape=INPUT_COUNT)
+    X = pm.Data('X', train_data.iloc[:, 1:].T)
+    # Priors
+    alpha = pm.Normal('alpha', mu=0, sd=10)
+    beta = pm.Normal('beta', mu=0, sd=10, shape=(22,))
+    # Linear combination of features
+    mu = alpha + pm.math.dot(beta, X)
+    # Likelihood function
+    y_obs = pm.Bernoulli('y_obs', logit_p=mu, observed=train_data['class'])
+    # Run variational inference
+    approx = pm.fit(method='advi', n=MODEL_ITERATION)
 
-    # Define prior for the bias term
-    b = pm.Normal('b', mu=0, sd=1)
-
-    # Define the likelihood function
-    mu = pm.math.dot(X, w) + b
-    sigma = pm.HalfNormal('sigma', 1, shape=1)
-    y_pred = pm.Normal('y_obs', mu=mu, sigma=sigma, observed=train_y)
-
-    # Run the inference algorithm
-    approx = pm.fit(20000, method='advi')
-
-    # Draw samples from the posterior distribution
-    trace = approx.sample(draws=1000)
+# Get the posterior distribution
+trace = approx.sample(draws=1000)
 
 
+# Get posterior predictive distribution for test data
 with model:
-    pm.set_data({'X': test_x})
-    ppc = pm.sample_posterior_predictive(trace)
+    pm.set_data({'X': test_data.iloc[:, 1:].T})
+
+    ppc = pm.sample_posterior_predictive(trace, model=model, samples=POSTERIOR_SAMPLES)
     y_pred = ppc['y_obs'].mean(axis=0)
-    output_std = torch.mean(ppc['y_obs'].std(axis=0))
-    test_loss = torch.sqrt(torch.mean((test_y - y_pred) ** 2))
 
 
-print("Test msr error: ", test_loss.item())
-
-print("average STD: ", output_std)
-
-
-
+# Compute accuracy on test data
+accuracy = np.mean((y_pred > 0.5) == test_data['class'])
+print(f'Test accuracy: {accuracy}')
