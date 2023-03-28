@@ -1,90 +1,174 @@
-import torch
-import torch.nn as nn
 import torchbnn as bnn
-import torch.optim as optim
-import pandas as pd
-import numpy as np
 from torch.utils.data import DataLoader, Dataset
+import torch
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+import pandas as pd
 import matplotlib.pyplot as plt
 
+
+PERCENT_OF_MIXED_LABELS = 0.4
+DROPOUT_RATE = 0.3
+BATCH_SIZE = 32
+TRAIN_TEST_SPLIT = 0.7
 LEARNING_RATE = 0.01
-BATCH_SIZE = 100
-TEST_BATCH_SIZE = 5
-EPOCHS = 1000
-TEST_TRAIN_SPLIT = 0.7
-PRIOR_TYPE = 'gaussian' # 'gaussian' or 'gsm'
-PERCENT_OF_MIXED_LABELS = 0.3
-KL_WEIGHT = 0.1
 
 # Load the mushroom dataset
-data = pd.read_csv("../data/mushrooms.csv")
+data_path = "../data/mushrooms.csv"
 
-# Set column names
-col_names = ['class', 'cap-shape', 'cap-surface', 'cap-color', 'bruises', 'odor', 'gill-attachment',
-             'gill-spacing', 'gill-size', 'gill-color', 'stalk-shape', 'stalk-root', 'stalk-surface-above-ring',
-             'stalk-surface-below-ring', 'stalk-color-above-ring', 'stalk-color-below-ring', 'veil-type',
-             'veil-color', 'ring-number', 'ring-type', 'spore-print-color', 'population', 'habitat']
-data.columns = col_names
+class MushroomDataset(torch.utils.data.Dataset):
+    def __init__(self, train=False):
 
-# Convert categorical features to numeric
-for col in data.columns:
-    data[col] = pd.Categorical(data[col]).codes
+        data = pd.read_csv(data_path, header=None)
 
-train_size = int(len(data) * TEST_TRAIN_SPLIT)
-train_data = data.iloc[:train_size, :]
-test_data = data.iloc[train_size:, :]
-
-# mix class label randomly
-num_train = len(train_data)
-num_to_mix = int(num_train*PERCENT_OF_MIXED_LABELS)
-mix_indices = np.random.choice(num_train, num_to_mix, replace=False)
-for idx in mix_indices:
-    train_data.at[idx, 'class'] = 1 - train_data.at[idx, 'class']
-
-X_train = train_data.drop('class', axis=1)
-X_train = np.array(X_train)
-Y_train = train_data['class'].to_numpy()
-X_train, Y_train = torch.from_numpy(X_train).float(), torch.from_numpy(Y_train).float()
+        # Encode y values
+        labelValues = pd.Categorical(data[0][1:]).codes
+        self.y = torch.tensor(pd.get_dummies(labelValues).values, dtype=torch.float32)
 
 
-X_test = test_data.drop('class', axis=1)
-X_test = np.array(X_test)
-Y_test = test_data['class'].to_numpy()
-X_test, Y_test = torch.from_numpy(X_test).float(), torch.from_numpy(Y_test).float()
 
-model = nn.Sequential(
-    bnn.BayesLinear(prior_mu=0, prior_sigma=0.1, in_features=22, out_features=100),
-    nn.ReLU(),
-    bnn.BayesLinear(prior_mu=0, prior_sigma=0.1, in_features=100, out_features=1),
-    nn.Softmax(),
+        # Encode x values
+        data = data.drop(columns=[0])
+        self.X = []
+        self.inputSize = 0
+        for column in data:
+            values = pd.Categorical(data[column]).codes
+            tensor = torch.tensor(pd.get_dummies(values).values, dtype=torch.float32)
+            self.X.append(tensor)
+            self.inputSize += len(data[column].unique())
+
+        if train:
+            self.X = [x[:round(len(x) * TRAIN_TEST_SPLIT)] for x in self.X]
+            self.y = self.y[:round(len(self.y) * TRAIN_TEST_SPLIT)]
+
+            # create a mask of indices to flip
+            mask = np.random.choice(len(self.y), int(len(self.y) * PERCENT_OF_MIXED_LABELS), replace=False)
+            # flip the values at the selected indices
+            self.y[mask] = 1 - self.y[mask]
+            self.num_samples = len(self.y)
+
+        else:
+            self.X = [x[round(len(x) * TRAIN_TEST_SPLIT):] for x in self.X]
+            self.y = self.y[round(len(self.y) * TRAIN_TEST_SPLIT):]
+            self.num_samples = len(self.y)
+
+    def __getitem__(self, index):
+        # return the feature and label at the given index
+        return [x[index] for x in self.X], self.y[index]
+
+    def __len__(self):
+        # return the total number of samples in the dataset
+        return self.num_samples
+
+
+mushroom_data = pd.read_csv(data_path)
+
+train_dataset = MushroomDataset(train=True)
+test_dataset = MushroomDataset(train=False)
+
+dataloader_train = torch.utils.data.DataLoader(
+    dataset=train_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=True
+)
+
+dataloader_test = torch.utils.data.DataLoader(
+    dataset=test_dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=False
 )
 
 
-ce_loss = nn.CrossEntropyLoss()
+class BNN(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(BNN, self).__init__()
+        self.fc1 = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1, in_features=input_dim, out_features=hidden_dim)
+        self.fc2 = bnn.BayesLinear(prior_mu=0, prior_sigma=0.1, in_features=hidden_dim, out_features=output_dim)
+
+    def forward(self, x):
+        x = torch.cat(x, dim=1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.fc2(x)
+        return x
+
+
 kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
 kl_weight = 0.01
-
-optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
-for step in range(EPOCHS):
-    pre = model(X_train)
-    ce = ce_loss(pre[:,0], Y_train)
-    kl = kl_loss(model)
-    cost = ce + kl_weight * kl
-
+def train(model, optimizer, criterion, X_train, y_train):
     optimizer.zero_grad()
-    cost.backward()
+    output = model(X_train)
+    ce = criterion(output, y_train)
+    kl = kl_loss(model)
+    loss = ce + kl_weight * kl
+
     optimizer.step()
-
-_, predicted = torch.max(pre.data, 1)
-total = Y_train.size(0)
-correct = (predicted == Y_train).sum()
-print('- Training: Accuracy: %f %%' % (100 * float(correct) / total))
-print('- CE : %2.2f, KL : %2.2f' % (ce.item(), kl.item()))
+    loss.backward()
+    optimizer.step()
+    return loss.item()
 
 
-total = Y_test.size(0)
-test_result = model(X_test)
+def evaluate(model, criterion, X_test, y_test):
+    output = model(X_test)
+    loss = criterion(output, y_test)
+    pred_max = torch.argmax(output, dim=1)
+    actual_max = torch.argmax(y_test, dim=1)
+    correct_count = (pred_max == actual_max).sum().item()
+    acc = correct_count / y_test.shape[0]
+    return loss.item(), acc
 
-correct = (test_result[:,0] == Y_test).sum()
-print('- Test Accuracy: %f %%' % (100 * float(correct) / total))
+
+# Set the model hyperparameters
+input_dim = train_dataset.inputSize
+hidden_dim = 128
+output_dim = 2
+
+# Initialize the model and optimizer
+
+model = BNN(input_dim, hidden_dim, output_dim)
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+criterion = nn.CrossEntropyLoss()
+
+# Train the model with Monte Carlo Dropout
+
+loss_plot_train = []
+loss_plot_test = []
+acc_plot_train = []
+acc_plot_test = []
+for step in range(200):
+    losses = []
+    accs = []
+    for x, y in dataloader_train:
+        train(model, optimizer, criterion, x, y)
+
+    for x, y in dataloader_test:
+        loss, acc = evaluate(model, criterion, x, y)
+
+        losses.append(loss)
+        accs.append(acc)
+
+    loss_plot_test.append(np.mean(losses))
+    acc_plot_test.append(np.mean(accs))
+
+
+    if step % 10 == 0:
+        _, axes = plt.subplots(nrows=2, ncols=1)
+        ax1 = axes[0]
+        ax1.set_title("Loss")
+        ax1.plot(loss_plot_test, 'r-', label='test')
+        ax1.legend()
+        ax1.set_ylabel("Loss")
+
+        ax1 = axes[1]
+        ax1.set_title("Acc")
+        ax1.plot(acc_plot_test, 'r-', label='test')
+        ax1.legend()
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Acc.")
+        plt.show()
+        print('Step: ', step, 'got accuracy: ', acc_plot_test[-1])
+
+
+
+print('BBB: mixed labels: ',PERCENT_OF_MIXED_LABELS, 'got accuracy: ', acc_plot_test[-1])
