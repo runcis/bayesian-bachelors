@@ -5,11 +5,25 @@ import torch.nn.functional as F
 import pandas as pd
 import matplotlib.pyplot as plt
 
-PERCENT_OF_MIXED_LABELS = 0.1
-DROPOUT_RATE = 0.3
-BATCH_SIZE = 32
+PERCENT_OF_MIXED_LABELS = 0
+BATCH_SIZE = 128
 TRAIN_TEST_SPLIT = 0.7
 LEARNING_RATE = 0.01
+NUMBER_OF_EPOCHS = 300
+HIDDEN_LAYER_NODES_1 = 50
+HIDDEN_LAYER_NODES_2 = 50
+HIDDEN_LAYER_NODES_3 = 50
+
+NUMBER_OF_SAMPLE = 500
+DROPOUT_RATE = 0.3
+
+OUTPUT_DIMENSION = 2 #don't change:
+DEVICE = 'cpu'
+if torch.cuda.is_available():
+    print('cuda')
+    DEVICE = 'cuda'
+else:
+    print('cpu')
 
 # Load the mushroom dataset
 data_path = "../data/mushrooms.csv"
@@ -22,8 +36,6 @@ class MushroomDataset(torch.utils.data.Dataset):
         # Encode y values
         labelValues = pd.Categorical(data[0][1:]).codes
         self.y = torch.tensor(pd.get_dummies(labelValues).values, dtype=torch.float32)
-
-
 
         # Encode x values
         data = data.drop(columns=[0])
@@ -78,11 +90,11 @@ dataloader_test = torch.utils.data.DataLoader(
 
 
 class BNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim):
         super(BNN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.fc1 = nn.Linear(input_dim, HIDDEN_LAYER_NODES_1)
+        self.fc2 = nn.Linear(HIDDEN_LAYER_NODES_1, HIDDEN_LAYER_NODES_2)
+        self.fc3 = nn.Linear(HIDDEN_LAYER_NODES_2, OUTPUT_DIMENSION)
         self.dropout = nn.Dropout(p=DROPOUT_RATE)
 
     def forward(self, x):
@@ -99,6 +111,9 @@ def train(model, optimizer, criterion, X_train, y_train):
     model.train()
     optimizer.zero_grad()
     output = model(X_train)
+
+    for k in range(len(output)):
+        output[k] = output[k].to(DEVICE)
     loss = criterion(output, y_train)
     loss.backward()
     optimizer.step()
@@ -106,22 +121,37 @@ def train(model, optimizer, criterion, X_train, y_train):
 
 def evaluate(model, criterion, X_test, y_test):
     model.eval()
-    output = model(X_test)
-    loss = criterion(output, y_test)
-    pred_max = torch.argmax(output, dim=1)
+
+    # Run model on a batch of inputs, NUMBER_OF_SAMPLE times
+    outputs = []
+    for i in range(NUMBER_OF_SAMPLE):
+        output = model(X_test)
+        outputs.append(output.cpu().detach().numpy())
+    outputs = np.stack(outputs)
+
+    # Create tensor from mean of samples
+    mean_output = torch.tensor(np.mean(outputs, axis=0), dtype=torch.float32).to(DEVICE)
+
+    # Calculate variance from samples
+    #var_output = np.var(outputs, axis=0)
+    max_indices = torch.argmax(mean_output, dim=1)
+    #var_output = var_output[torch.arange(var_output.shape[0]), max_indices]
+
+    # Calculate loss
+    loss = criterion(mean_output, y_test).cpu()
+
+    # Calculate accurately predicted labels
+    pred_max = torch.argmax(mean_output, dim=1)
     actual_max = torch.argmax(y_test, dim=1)
     correct_count = (pred_max == actual_max).sum().item()
     acc = correct_count / y_test.shape[0]
-    return loss.item(), acc
 
+    return acc, loss
 
-# Set the model hyperparameters
-input_dim = train_dataset.inputSize
-hidden_dim = 128
-output_dim = 2
 
 # Initialize the model and optimizer
-model = BNN(input_dim, hidden_dim, output_dim)
+model = BNN(train_dataset.inputSize)
+model.to(DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 criterion = nn.CrossEntropyLoss()
 
@@ -131,36 +161,55 @@ loss_plot_train = []
 loss_plot_test = []
 acc_plot_train = []
 acc_plot_test = []
-for step in range(200):
-    losses = []
-    accs = []
-    for x, y in dataloader_train:
-        train(model, optimizer, criterion, x, y)
+for step in range(NUMBER_OF_EPOCHS):
+    print(step)
 
-    for x, y in dataloader_test:
-        loss, acc = evaluate(model, criterion, x, y)
+    for dataloader in [dataloader_train, dataloader_test]:
+        losses = []
+        accs = []
+        for x , y in dataloader:
 
-        losses.append(loss)
-        accs.append(acc)
+            for i in range(len(x)):
+                x[i] = x[i].to(DEVICE)
+            y = y.to(DEVICE)
 
-    loss_plot_test.append(np.mean(losses))
-    acc_plot_test.append(np.mean(accs))
+            if dataloader == dataloader_train:
+                loss = train(model, optimizer, criterion, x, y)
+            else:
+                acc, loss = evaluate(model, criterion, x, y)
+                accs.append(acc)
+
+            losses.append(loss)
+
+        if dataloader == dataloader_train:
+            loss_plot_train.append(np.mean(losses))
+        else:
+            loss_plot_test.append(np.mean(losses))
+            acc_plot_test.append(np.mean(accs))
 
 
     if step % 10 == 0:
-        _, axes = plt.subplots(nrows=2, ncols=1)
+        _, axes = plt.subplots(nrows=3, ncols=1, figsize=(10,10))
         ax1 = axes[0]
-        ax1.set_title("Loss")
-        ax1.plot(loss_plot_test, 'r-', label='test')
+        ax1.set_title("Training loss")
+        ax1.plot(loss_plot_train, 'r-', label='train')
         ax1.legend()
-        ax1.set_ylabel("Loss")
+        ax1.set_ylabel("loss")
 
         ax1 = axes[1]
-        ax1.set_title("Acc")
-        ax1.plot(acc_plot_test, 'r-', label='test')
+        ax1.set_title("Testing Loss")
+        ax1.plot(loss_plot_test, 'r-', label='test')
         ax1.legend()
+        ax1.set_ylabel("loss.")
+
+        ax1 = axes[2]
+        ax1.set_title("Accuracy")
+        ax1.plot(acc_plot_test, 'g-', label='test')
+        ax1.legend()
+        ax1.set_ylabel("Accuracy")
+
         ax1.set_xlabel("Epoch")
-        ax1.set_ylabel("Acc.")
+        plt.subplots_adjust(hspace=0.5)
         plt.show()
         print('Step: ', step, 'got accuracy: ', acc_plot_test[-1])
 

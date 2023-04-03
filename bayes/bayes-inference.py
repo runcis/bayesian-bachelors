@@ -2,11 +2,13 @@ import pandas as pd
 import numpy as np
 import pymc3 as pm
 import arviz as az
+import torch
 import matplotlib.pyplot as plt
 
 TEST_TRAIN_SPLIT = .8
 MODEL_ITERATION = 10000
 POSTERIOR_SAMPLES = 500
+DRAWS = 1000
 PERCENT_OF_MIXED_LABELS = 0.3
 
 # Load the mushroom dataset
@@ -53,7 +55,7 @@ with pm.Model() as model:
     approx = pm.fit(method='advi', n=MODEL_ITERATION)
 
 # Get the posterior distribution
-trace = approx.sample(draws=1000)
+trace = approx.sample(draws=DRAWS)
 
 
 # Get posterior predictive distribution for test data
@@ -67,3 +69,14 @@ with model:
 # Compute accuracy on test data
 accuracy = np.mean((y_pred > 0.5) == test_data['class'])
 print(f'Test accuracy: {accuracy}')
+
+# Step 3: Calculate the prediction interval for each input
+max_probs, _ = torch.max(torch.tensor(y_pred), dim=1)  # shape: (batch_size,)
+pred_intervals = torch.stack([0.5 * torch.ones_like(max_probs), max_probs], dim=1)  # shape: (batch_size, 2)
+
+# Step 4: Determine whether the actual target value falls within the prediction interval
+correct_preds = torch.logical_and(test_data['class'] == 1, torch.logical_and(y_pred[:,1] >= pred_intervals[:,0], y_pred[:,1] <= pred_intervals[:,1]))
+
+# Step 5: Calculate the PICP
+picp = torch.mean(correct_preds.float()) * 100.0
+print(f"Prediction interval coverage probability: {picp:.2f}%")
